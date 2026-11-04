@@ -1,0 +1,4 @@
+# Local development and tests only.
+-r requirements.txt
+pytest==9.2.0
+httpx2==2.16.0  # used by FastAPI's TestClient (successor to httpx; see DECISIONS.md)

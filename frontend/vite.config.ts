@@ -12,11 +12,4 @@ export default defineConfig({
       '@': path.resolve(import.meta.dirname, './src'),
     },
   },
-  server: {
-    fs: {
-      // Phase 1 only: the frontend reads the seed guide JSON files from
-      // ../seed_data. Phase 2 replaces this with API calls to the backend.
-      allow: ['..'],
-    },
-  },
 })
