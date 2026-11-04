@@ -1,0 +1,237 @@
+{
+  "slug": "google-drive",
+  "name": "Google Drive",
+  "category": "File storage",
+  "short_description": "Set up a Google Cloud project, consent screen and OAuth client to access users' Google Drive files.",
+  "guide_content": {
+    "schema_version": 1,
+    "application_name": "Google Drive",
+    "website_url": "https://drive.google.com",
+    "oauth_status": "supported",
+    "summary": "Google Drive API access uses Google's OAuth 2.0 web server flow. You create a Google Cloud project, enable the Drive API, configure the consent screen in Google Auth Platform, and create a Web application OAuth client. Whether Google must verify your app depends on the scopes you request: non-sensitive Drive scopes like drive.file avoid mandatory verification, while restricted scopes such as full drive access require verification and an annual security assessment.",
+    "complexity": "complex",
+    "complexity_rationale": "Several console stages (project, API enablement, branding, audience, data access, client), a three-tier scope classification (non-sensitive / sensitive / restricted) that decides verification, testing-mode limits (100 test users, 7-day token expiry), and for restricted scopes an annual third-party security assessment.",
+    "prerequisites": [
+      {
+        "id": "gd-pre-account",
+        "title": "A Google account and a Google Cloud project",
+        "description": "You need a Google Account and a project in the Google Cloud console (select an existing one or create a new one). A Cloud Organization is optional, though Google strongly recommends one. The console may prompt you to enable billing; the fetched docs do not state that the Drive API itself requires billing.",
+        "evidence_label": "verified",
+        "source_ids": ["gd-webserver", "gd-policies"]
+      },
+      {
+        "id": "gd-pre-scope-choice",
+        "title": "Decide which Drive scope you really need",
+        "description": "This choice drives verification. Google recommends non-sensitive scopes where possible (drive.file gives per-file access via a picker). Restricted scopes are allowed only for specific app types (backup and sync, productivity and education, reporting and security).",
+        "evidence_label": "verified",
+        "source_ids": ["gd-scopes"]
+      },
+      {
+        "id": "gd-pre-domain",
+        "title": "For production: a verified domain, homepage and privacy policy",
+        "description": "Brand verification requires a homepage on a verified domain (not only a login page), a privacy policy linked from the homepage and consent screen, and domain ownership verified via Google Search Console.",
+        "evidence_label": "verified",
+        "source_ids": ["gd-verify-req"]
+      }
+    ],
+    "setup_steps": [
+      {
+        "id": "gd-step-enable",
+        "title": "Enable the Google Drive API",
+        "description": "In the API Library (https://console.developers.google.com/apis/library), select or create a project, find Google Drive API and click Enable.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["gd-webserver"]
+      },
+      {
+        "id": "gd-step-branding",
+        "title": "Configure the consent screen (Google Auth Platform → Branding)",
+        "description": "Go to Menu → Google Auth platform → Branding. Enter App name and User support email, choose the Audience, add a Contact email, accept the Google API Services: User Data Policy, and click Create. The consent screen cannot be removed once configured.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["gd-consent"]
+      },
+      {
+        "id": "gd-step-audience",
+        "title": "Choose Internal or External audience",
+        "description": "Internal limits authorization to members of your Google Cloud Organization (and avoids Google review of sensitive/restricted scopes). External makes the app available to any Google Account. For External apps in Testing, add test users under Audience → Test users.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["gd-audience", "gd-consent"]
+      },
+      {
+        "id": "gd-step-data-access",
+        "title": "Add the Drive scopes (Data Access)",
+        "description": "Under Data Access → Add or Remove Scopes, select the minimum scopes your app needs.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["gd-consent"]
+      },
+      {
+        "id": "gd-step-client",
+        "title": "Create a Web application OAuth client",
+        "description": "On the Clients page (https://console.developers.google.com/auth/clients) click Create Client, choose Web application, and add your redirect URIs. The client secret is shown only after creation and cannot be viewed or downloaded again, so download client_secret.json and store it outside your source tree.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["gd-webserver"]
+      },
+      {
+        "id": "gd-step-flow",
+        "title": "Implement the authorization request",
+        "description": "Send users to Google's authorization endpoint with your client ID, an exact-match redirect_uri, the scopes, a state value, and access_type=offline if you need a refresh token. A refresh token is returned only on the first authorization unless you request prompt=consent.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["gd-webserver"]
+      },
+      {
+        "id": "gd-step-granted",
+        "title": "Check which scopes were actually granted",
+        "description": "Users can grant only some scopes; Google states your app must verify which scopes were actually granted.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["gd-webserver"]
+      },
+      {
+        "id": "gd-step-verify",
+        "title": "(Conditional) Submit for verification before going to production",
+        "description": "Required for External apps requesting sensitive or restricted scopes. Non-sensitive-only apps can skip it, but need lighter brand verification to show an app name and logo. Restricted scopes also require an annual CASA security assessment, after which Google issues a Letter of Validation.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["gd-verify-overview", "gd-verify-req", "gd-casa"]
+      }
+    ],
+    "permissions_scopes": [
+      { "name": "https://www.googleapis.com/auth/drive.file", "explanation": "Non-sensitive. Create new Drive files, or modify files the user opens with your app or shares with it via the Google Picker / your file picker. Google's recommended scope; allows a more streamlined verification process.", "is_conditional": false, "condition_note": null, "evidence_label": "verified", "source_ids": ["gd-scopes"] },
+      { "name": "https://www.googleapis.com/auth/drive.appdata", "explanation": "Non-sensitive. View and manage your app's own configuration data in the user's Drive.", "is_conditional": true, "condition_note": "Only if you store app-private config in Drive.", "evidence_label": "verified", "source_ids": ["gd-scopes"] },
+      { "name": "https://www.googleapis.com/auth/drive.apps.readonly", "explanation": "Sensitive. View apps authorized to access the user's Drive. Requires verification for External apps.", "is_conditional": true, "condition_note": "Rarely needed.", "evidence_label": "verified", "source_ids": ["gd-scopes"] },
+      { "name": "https://www.googleapis.com/auth/drive.metadata.readonly", "explanation": "Restricted. View metadata for files in the user's Drive. Restricted scopes require verification plus an annual security assessment.", "is_conditional": true, "condition_note": "Only for eligible app types that must list all files.", "evidence_label": "verified", "source_ids": ["gd-scopes", "gd-casa"] },
+      { "name": "https://www.googleapis.com/auth/drive.readonly", "explanation": "Restricted. Read access to all of the user's Drive files. Broad; requires verification and an annual security assessment.", "is_conditional": true, "condition_note": "Only if per-file access (drive.file) cannot meet your use case and your app type is eligible.", "evidence_label": "verified", "source_ids": ["gd-scopes", "gd-casa"] },
+      { "name": "https://www.googleapis.com/auth/drive", "explanation": "Restricted. Full access to all of the user's Drive files. The broadest scope; requires verification and an annual security assessment. Google recommends migrating restricted-scope apps to a non-sensitive scope where possible.", "is_conditional": true, "condition_note": "Only for eligible app types that genuinely need full Drive access.", "evidence_label": "verified", "source_ids": ["gd-scopes", "gd-casa"] }
+    ],
+    "credentials_configuration": [
+      { "name": "Google Cloud project", "description": "Container for the API enablement, consent screen and OAuth client.", "where_obtained": "Google Cloud console project selector.", "is_secret": false, "evidence_label": "verified", "source_ids": ["gd-webserver"] },
+      { "name": "Consent screen (Branding, Audience, Data Access)", "description": "App name, support email, audience (Internal/External), test users, and scopes shown to users.", "where_obtained": "Google Auth Platform pages in the Cloud console.", "is_secret": false, "evidence_label": "verified", "source_ids": ["gd-consent"] },
+      { "name": "OAuth client ID", "description": "Identifies your Web application client.", "where_obtained": "Google Auth Platform → Clients.", "is_secret": false, "evidence_label": "verified", "source_ids": ["gd-webserver"] },
+      { "name": "OAuth client secret / client_secret.json", "description": "Confidential; shown only once, at creation. Store outside your source tree and only on the backend.", "where_obtained": "Shown when you create the client; download client_secret.json immediately.", "is_secret": true, "evidence_label": "verified", "source_ids": ["gd-webserver", "gd-policies"] },
+      { "name": "Authorized redirect URIs", "description": "Must use HTTPS (localhost exempt), no raw IP hosts, no fragments, no wildcards; scheme, case and trailing slash must match exactly.", "where_obtained": "Configured on the OAuth client.", "is_secret": false, "evidence_label": "verified", "source_ids": ["gd-webserver"] }
+    ],
+    "time_approval": {
+      "active_effort_min_minutes": 45,
+      "active_effort_max_minutes": 120,
+      "active_effort_label": "estimated",
+      "active_effort_basis": "Console setup in Testing mode: project, Drive API, branding, audience, scopes, client and redirect URIs. Excludes integration code, domain verification, demo-video preparation for verification, and any security assessment. Not published by Google.",
+      "review_requirement": "conditional",
+      "review_requirement_explanation": "Verification is required for External apps requesting sensitive or restricted scopes. Not mandatory for apps using only non-sensitive scopes (brand verification is needed to show your name and logo). Internal apps used only within your Workspace organization don't need Google review of sensitive/restricted scopes. Restricted scopes additionally require an annual security assessment.",
+      "review_source_ids": ["gd-verify-overview", "gd-consent", "gd-casa", "gd-recert"],
+      "review_wait": {
+        "evidence_label": "unknown",
+        "summary": "Unknown. None of the fetched official Google pages publish a verification or security-assessment review duration.",
+        "source_ids": ["gd-verify-overview", "gd-verify-req"]
+      },
+      "elapsed_time_note": "In Testing mode you can start right after the active setup, but only with up to 100 test users whose authorizations expire after 7 days. Production use of sensitive/restricted scopes waits on verification (duration Unknown); restricted scopes also wait on the security assessment."
+    },
+    "agent_human_tasks": {
+      "agent_can_do": [
+        "Find and compare Google's OAuth, Drive scope, consent screen and verification documentation.",
+        "Classify each candidate Drive scope as non-sensitive, sensitive or restricted.",
+        "Explain how your scope choice changes verification requirements.",
+        "Prepare suggested values such as a redirect URI format and a minimal scope set.",
+        "Attempt to view the credentials page without signing in and record the result."
+      ],
+      "human_must_do": [
+        "Sign in to Google Cloud, create the project and enable the Drive API.",
+        "Accept the Google API Services: User Data Policy when configuring branding.",
+        "Configure audience, test users and scopes; create the OAuth client and store its secret.",
+        "Verify domain ownership in Search Console and submit for verification if required.",
+        "Complete the annual security assessment if using restricted scopes.",
+        "Note: end users consent to your scopes on Google's consent screen; Workspace admins may block apps by policy."
+      ]
+    },
+    "portal_exploration": {
+      "status": "not_accessible",
+      "entry_point_url": "https://console.cloud.google.com/apis/credentials",
+      "pages_inspected": [
+        {
+          "url": "https://console.cloud.google.com/apis/credentials",
+          "observation": "Signed out, the request was redirected (HTTP 302) to Google's ServiceLogin sign-in page. No credentials or consent-screen content was visible."
+        }
+      ],
+      "safe_actions_attempted": [
+        "Fetched the credentials page with a plain HTTP GET while signed out (no JavaScript execution). The sign-in redirect was not followed further."
+      ],
+      "observations": [
+        "All Google Auth Platform and Clients pages require a signed-in Google account.",
+        "The page names and fields in this guide come from Google's documentation, not from direct portal observation."
+      ],
+      "inaccessible_steps": [
+        "Project creation, API enablement, Branding/Audience/Data Access, and client creation all require sign-in."
+      ],
+      "stop_reason": "Redirected to sign-in. Logging in is outside what the research agent may do.",
+      "human_handoff": "Sign in at https://console.cloud.google.com, select or create a project, enable the Google Drive API, then open Google Auth platform → Branding to configure the consent screen.",
+      "sandbox_or_test_mode": "Yes: External apps in Testing publishing status can be used by up to 100 listed test users; their authorizations (and refresh tokens) expire 7 days after consent unless only basic profile scopes are requested.",
+      "source_ids": ["gd-portal", "gd-audience"]
+    },
+    "composio_managed_oauth": {
+      "availability": "available",
+      "own_app_required": "conditional",
+      "explanation": "Composio's Google Drive toolkit page states \"Composio-managed OAuth available? Yes\" and that by default the consent screen uses Composio's OAuth app. Composio notes that requesting extra scopes can trigger an \"App is blocked\" screen unless the app is verified for them.",
+      "when_to_bring_own_app": [
+        "You need scopes beyond those Composio's managed app is approved for.",
+        "You want your own app name and logo on Google's consent screen (you'd then complete Google verification yourself).",
+        "You need a dedicated rate-limit quota instead of a shared one."
+      ],
+      "evidence_label": "verified",
+      "source_ids": ["cmp-googledrive", "cmp-catalog", "cmp-custom-vs-managed"]
+    },
+    "common_issues": [
+      { "issue": "redirect_uri_mismatch", "explanation": "The redirect_uri does not exactly match an authorized redirect URI for the client.", "resolution": "Compare against the Clients page; scheme, case and trailing slash must all match.", "source_ids": ["gd-webserver"] },
+      { "issue": "\"Unverified app\" screen / user cap", "explanation": "An app requesting sensitive or restricted scopes before verification shows a warning and is limited to 100 new users over the project's lifetime (the cap cannot be reset).", "resolution": "Stay in Testing with listed test users, or submit for verification.", "source_ids": ["gd-audience", "gd-webserver"] },
+      { "issue": "invalid_grant", "explanation": "The refresh token expired or was invalidated (e.g. revoked, unused for six months, Testing-mode 7-day expiry, or over the 100-refresh-tokens-per-account-per-client limit).", "resolution": "Re-authenticate the user and ask for consent again.", "source_ids": ["gd-oauth2", "gd-audience"] },
+      { "issue": "admin_policy_enforced", "explanation": "The user's Google Workspace administrator blocks one or more requested scopes.", "resolution": "The Workspace admin must allow your app.", "source_ids": ["gd-webserver"] },
+      { "issue": "org_internal", "explanation": "The client belongs to a project limited to accounts in a specific Cloud Organization (Internal audience).", "resolution": "Switch the audience to External or use an account within the organization.", "source_ids": ["gd-webserver", "gd-audience"] },
+      { "issue": "No refresh token returned", "explanation": "Google returns a refresh token only on the first authorization.", "resolution": "Use access_type=offline, and prompt=consent when you need a new refresh token.", "source_ids": ["gd-webserver"] }
+    ],
+    "sources": [
+      { "id": "gd-oauth2", "title": "Using OAuth 2.0 to Access Google APIs", "url": "https://developers.google.com/identity/protocols/oauth2", "domain": "developers.google.com", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "gd-webserver", "title": "Using OAuth 2.0 for Web Server Applications", "url": "https://developers.google.com/identity/protocols/oauth2/web-server", "domain": "developers.google.com", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "gd-scopes", "title": "Choose Google Drive API scopes", "url": "https://developers.google.com/workspace/drive/api/guides/api-specific-auth", "domain": "developers.google.com", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "gd-consent", "title": "Configure the OAuth consent screen and choose scopes", "url": "https://developers.google.com/workspace/guides/configure-oauth-consent", "domain": "developers.google.com", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "gd-policies", "title": "OAuth 2.0 Policies", "url": "https://developers.google.com/identity/protocols/oauth2/policies", "domain": "developers.google.com", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "gd-verify-overview", "title": "OAuth App Verification Help Center overview", "url": "https://support.google.com/cloud/answer/13463073", "domain": "support.google.com", "source_type": "official_provider_support", "accessed_at": "2026-11-04" },
+      { "id": "gd-verify-req", "title": "Verification requirements", "url": "https://support.google.com/cloud/answer/13464321", "domain": "support.google.com", "source_type": "official_provider_support", "accessed_at": "2026-11-04" },
+      { "id": "gd-audience", "title": "Manage App Audience", "url": "https://support.google.com/cloud/answer/15549945", "domain": "support.google.com", "source_type": "official_provider_support", "accessed_at": "2026-11-04" },
+      { "id": "gd-casa", "title": "Security assessment", "url": "https://support.google.com/cloud/answer/13465431", "domain": "support.google.com", "source_type": "official_provider_support", "accessed_at": "2026-11-04" },
+      { "id": "gd-recert", "title": "Annual recertification", "url": "https://support.google.com/cloud/answer/13463816", "domain": "support.google.com", "source_type": "official_provider_support", "accessed_at": "2026-11-04" },
+      { "id": "gd-portal", "title": "Google Cloud console – Credentials (portal entry page)", "url": "https://console.cloud.google.com/apis/credentials", "domain": "console.cloud.google.com", "source_type": "official_provider_portal", "accessed_at": "2026-11-04" },
+      { "id": "cmp-googledrive", "title": "Composio – Google Drive toolkit", "url": "https://docs.composio.dev/toolkits/googledrive", "domain": "docs.composio.dev", "source_type": "official_composio_docs", "accessed_at": "2026-11-04" },
+      { "id": "cmp-catalog", "title": "Composio – Managed auth catalog", "url": "https://docs.composio.dev/toolkits/managed-auth", "domain": "docs.composio.dev", "source_type": "official_composio_docs", "accessed_at": "2026-11-04" },
+      { "id": "cmp-custom-vs-managed", "title": "Composio – Custom app vs managed app", "url": "https://docs.composio.dev/docs/authentication/custom-app-vs-managed-app", "domain": "docs.composio.dev", "source_type": "official_composio_docs", "accessed_at": "2026-11-04" }
+    ],
+    "evidence_notes": [
+      { "claim": "Verification is required for External apps using sensitive or restricted scopes; not mandatory for non-sensitive-only apps.", "evidence_label": "verified", "verification_basis": "documentation", "source_ids": ["gd-verify-overview"] },
+      { "claim": "Restricted scopes require an annual security assessment (CASA) and Letter of Validation.", "evidence_label": "verified", "verification_basis": "documentation", "source_ids": ["gd-casa", "gd-recert"] },
+      { "claim": "Testing mode: up to 100 test users; authorizations expire after 7 days.", "evidence_label": "verified", "verification_basis": "documentation", "source_ids": ["gd-audience"] },
+      { "claim": "Verification / security-assessment review duration.", "evidence_label": "unknown", "verification_basis": null, "source_ids": [] },
+      { "claim": "Who pays for the security assessment.", "evidence_label": "unknown", "verification_basis": null, "source_ids": [] },
+      { "claim": "Active setup effort of 45–120 minutes.", "evidence_label": "estimated", "verification_basis": null, "source_ids": [] },
+      { "claim": "Composio-managed OAuth is available for Google Drive; extra scopes may be blocked unless verified.", "evidence_label": "verified", "verification_basis": "documentation", "source_ids": ["cmp-googledrive"] }
+    ],
+    "tested_status": {
+      "status": "not_tested",
+      "notes": "No Google Cloud project or OAuth client was created and no authorization flow was run. All Verified labels are documentation-based."
+    },
+    "last_researched_at": "2026-11-04",
+    "checklist_items": [
+      { "id": "gdrive-01-scope", "label": "Choose the narrowest Drive scope (prefer drive.file)", "source_ids": ["gd-scopes"] },
+      { "id": "gdrive-02-project", "label": "Create or select a Google Cloud project", "source_ids": ["gd-webserver"] },
+      { "id": "gdrive-03-enable", "label": "Enable the Google Drive API", "source_ids": ["gd-webserver"] },
+      { "id": "gdrive-04-branding", "label": "Configure Branding and choose Internal/External audience", "source_ids": ["gd-consent", "gd-audience"] },
+      { "id": "gdrive-05-test-users", "label": "Add test users (External apps in Testing)", "source_ids": ["gd-consent", "gd-audience"] },
+      { "id": "gdrive-06-scopes", "label": "Add scopes under Data Access", "source_ids": ["gd-consent"] },
+      { "id": "gdrive-07-client", "label": "Create a Web application client and add exact redirect URIs", "source_ids": ["gd-webserver"] },
+      { "id": "gdrive-08-secret", "label": "Download client_secret.json once and store it server-side only", "source_ids": ["gd-webserver"] },
+      { "id": "gdrive-09-offline", "label": "Implement the flow with access_type=offline and granted-scope checks", "source_ids": ["gd-webserver"] },
+      { "id": "gdrive-10-verify", "label": "Plan verification (and security assessment for restricted scopes) before production", "source_ids": ["gd-verify-overview", "gd-casa"] }
+    ]
+  }
+}

@@ -1,0 +1,234 @@
+{
+  "slug": "slack",
+  "name": "Slack",
+  "category": "Communication",
+  "short_description": "Create a Slack app and use OAuth v2 to install it into other workspaces and obtain bot or user tokens.",
+  "guide_content": {
+    "schema_version": 1,
+    "application_name": "Slack",
+    "website_url": "https://slack.com",
+    "oauth_status": "supported",
+    "summary": "Slack apps use OAuth v2 to be installed into workspaces and receive bot tokens (xoxb-) and/or user tokens (xoxp-). An app starts as a single-workspace app; installing it in other workspaces requires activating public distribution. Slack Marketplace listing is optional and has its own long review. Workspace admins may separately require approval before an app can be installed.",
+    "complexity": "medium",
+    "complexity_rationale": "More decisions than a single form: bot vs user scopes, enabling public distribution (with an HTTPS checklist), optional but irreversible token rotation, and two separate conditional approvals (workspace admin approval, optional Marketplace review with a published multi-week timeline).",
+    "prerequisites": [
+      {
+        "id": "slack-pre-account",
+        "title": "A Slack account and a development workspace",
+        "description": "You must sign in to Slack to create an app, and you choose a workspace to develop in when creating it. You can distribute the app to other workspaces later.",
+        "evidence_label": "verified",
+        "source_ids": ["slack-portal", "slack-quickstart"]
+      },
+      {
+        "id": "slack-pre-https",
+        "title": "HTTPS endpoints",
+        "description": "Redirect URLs must use HTTPS. For distributed apps, OAuth redirect URLs, interactivity request URLs, options-load URLs and Events API request URLs must all support SSL.",
+        "evidence_label": "verified",
+        "source_ids": ["slack-oauth", "slack-distribution"]
+      },
+      {
+        "id": "slack-pre-scopes",
+        "title": "A list of the minimum scopes you need",
+        "description": "Slack recommends requesting only the scopes your app needs, and generally adding scopes to the bot token rather than the user token.",
+        "evidence_label": "verified",
+        "source_ids": ["slack-quickstart", "slack-security"]
+      }
+    ],
+    "setup_steps": [
+      {
+        "id": "slack-step-create",
+        "title": "Create the app",
+        "description": "Signed in, go to https://api.slack.com/apps?new_app=1, choose \"Blank app\", enter an App Name, select your development workspace, and click Create.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["slack-quickstart"]
+      },
+      {
+        "id": "slack-step-scopes",
+        "title": "Add scopes",
+        "description": "In OAuth & Permissions, under Bot Token Scopes, click \"Add an OAuth Scope\" for each bot scope. Add user scopes only if you must act as the user.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["slack-quickstart"]
+      },
+      {
+        "id": "slack-step-redirect",
+        "title": "Configure the Redirect URL",
+        "description": "In OAuth & Permissions, add an HTTPS Redirect URL with no anchor (#). Any redirect_uri you send must match or be a subdirectory of a configured Redirect URL.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["slack-oauth"]
+      },
+      {
+        "id": "slack-step-distribute",
+        "title": "Activate public distribution (for other workspaces)",
+        "description": "In the app dashboard, open Manage Distribution → \"Share Your App with Other Workspaces\", complete every item in Slack's checklist, then click \"Activate Public Distribution\". Undistributed apps work only in their own workspace.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["slack-distribution"]
+      },
+      {
+        "id": "slack-step-authorize",
+        "title": "Send installers to the authorize URL",
+        "description": "Redirect users to https://slack.com/oauth/v2/authorize with client_id, scope (bot scopes), user_scope (user scopes, if any), redirect_uri and a state value.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["slack-oauth"]
+      },
+      {
+        "id": "slack-step-exchange",
+        "title": "Exchange the code with oauth.v2.access",
+        "description": "Within ten minutes, call https://slack.com/api/oauth.v2.access with code, client_id and client_secret. Verify state first. The response contains the bot token, and the user token under authed_user if requested.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["slack-oauth"]
+      },
+      {
+        "id": "slack-step-rotation",
+        "title": "(Optional) Decide on token rotation",
+        "description": "Without rotation, OAuth tokens do not expire. With rotation, access tokens expire every 12 hours and must be refreshed. Token rotation cannot be turned off once enabled, so decide deliberately.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["slack-oauth", "slack-rotation"]
+      },
+      {
+        "id": "slack-step-marketplace",
+        "title": "(Optional) Submit to the Slack Marketplace",
+        "description": "Recommended for commercial distribution, not required for unlisted distribution. Slack requires at least 10 active workspace installs before you can submit.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["slack-distribution", "slack-review"]
+      }
+    ],
+    "permissions_scopes": [
+      { "name": "chat:write", "explanation": "Send messages as your Slack app.", "is_conditional": true, "condition_note": "Needed if your app posts messages.", "evidence_label": "verified", "source_ids": ["slack-scopes"] },
+      { "name": "channels:read", "explanation": "View basic information about public channels in a workspace.", "is_conditional": true, "condition_note": "Needed to list or look up public channels.", "evidence_label": "verified", "source_ids": ["slack-scopes"] },
+      { "name": "channels:history", "explanation": "View messages and other content in public channels your app has been added to. Message content is sensitive; Slack's example security policy places this in a \"requires approval\" tier.", "is_conditional": true, "condition_note": "Only if your app must read message history.", "evidence_label": "verified", "source_ids": ["slack-scopes", "slack-security"] },
+      { "name": "users:read", "explanation": "View people in a workspace.", "is_conditional": true, "condition_note": "Needed to look up users.", "evidence_label": "verified", "source_ids": ["slack-scopes"] },
+      { "name": "im:write", "explanation": "Start direct messages with people.", "is_conditional": true, "condition_note": "Needed if your app opens DMs.", "evidence_label": "verified", "source_ids": ["slack-scopes"] },
+      { "name": "chat:write.public", "explanation": "Send messages to channels your app isn't a member of. Broader than chat:write.", "is_conditional": true, "condition_note": "Only if you must post without being invited to channels.", "evidence_label": "verified", "source_ids": ["slack-scopes"] }
+    ],
+    "credentials_configuration": [
+      { "name": "Client ID", "description": "Identifies your app in the authorize and oauth.v2.access calls.", "where_obtained": "App Management → Basic Information → App Credentials.", "is_secret": false, "evidence_label": "verified", "source_ids": ["slack-oauth", "slack-rotation"] },
+      { "name": "Client Secret", "description": "Used server-side in oauth.v2.access (code exchange and refresh).", "where_obtained": "App Management → Basic Information → App Credentials. Keep it in backend environment variables.", "is_secret": true, "evidence_label": "verified", "source_ids": ["slack-oauth", "slack-rotation"] },
+      { "name": "Redirect URL(s)", "description": "HTTPS URL(s) Slack redirects to after authorization; no # anchors.", "where_obtained": "App Management → OAuth & Permissions.", "is_secret": false, "evidence_label": "verified", "source_ids": ["slack-oauth"] },
+      { "name": "Bot token (xoxb-) / User token (xoxp-)", "description": "Returned by oauth.v2.access per installed workspace. These are your end users' workspace tokens; store them securely in your product, not in this guide tool.", "where_obtained": "oauth.v2.access response after a workspace installs your app.", "is_secret": true, "evidence_label": "verified", "source_ids": ["slack-oauth"] },
+      { "name": "Token rotation setting", "description": "Optional; makes access tokens expire every 12 hours with single-use refresh tokens. Irreversible once enabled.", "where_obtained": "OAuth & Permissions (unpublished apps) or Published App Settings (Marketplace apps); manifest field settings.token_rotation_enabled.", "is_secret": false, "evidence_label": "verified", "source_ids": ["slack-rotation"] }
+    ],
+    "time_approval": {
+      "active_effort_min_minutes": 30,
+      "active_effort_max_minutes": 90,
+      "active_effort_label": "estimated",
+      "active_effort_basis": "Creating the app, choosing scopes, configuring redirect URLs, and completing the public distribution checklist. Excludes building the integration and any Marketplace submission preparation. Not published by Slack.",
+      "review_requirement": "conditional",
+      "review_requirement_explanation": "No review is needed to install into your own workspace or to distribute an unlisted app. Two separate approvals may apply: (1) a workspace owner/admin must approve your app if that workspace requires app approval; (2) Slack Marketplace review applies only if you choose to list your app.",
+      "review_source_ids": ["slack-distribution", "slack-admin-approval", "slack-review"],
+      "review_wait": {
+        "evidence_label": "verified",
+        "summary": "Marketplace review only (optional): Slack states the preliminary review takes up to 10 business days to receive feedback, and the functional review up to 10 weeks for new submissions (6 weeks for published apps resubmitting changes). Workspace-admin approval time is Unknown and depends on each workspace.",
+        "source_ids": ["slack-review"]
+      },
+      "elapsed_time_note": "Unlisted distribution: elapsed time is roughly the active effort plus any per-workspace admin approval (Unknown). Marketplace listing adds the published review windows above, and requires 10+ active workspace installs first."
+    },
+    "agent_human_tasks": {
+      "agent_can_do": [
+        "Find and compare Slack's official OAuth, scopes, distribution and Marketplace documentation.",
+        "Extract endpoints, redirect URL rules and scope descriptions.",
+        "Prepare a minimal-scope proposal and a suggested HTTPS redirect URL format.",
+        "Attempt to view the app management page without signing in and record what is visible.",
+        "Prepare this checklist."
+      ],
+      "human_must_do": [
+        "Sign in to Slack and create the app in a development workspace.",
+        "Choose scopes and configure redirect URLs.",
+        "Complete the distribution checklist and activate public distribution.",
+        "Store the client secret and any workspace tokens securely.",
+        "Obtain workspace-admin approval where required, and submit to the Marketplace if desired.",
+        "Note: each workspace's installer separately consents to your app's scopes during installation."
+      ]
+    },
+    "portal_exploration": {
+      "status": "not_accessible",
+      "entry_point_url": "https://api.slack.com/apps",
+      "pages_inspected": [
+        {
+          "url": "https://api.slack.com/apps",
+          "observation": "Signed out, the page shows \"Your Apps\" and \"You'll need to sign in to your Slack account to create an application.\" with links to slack.com/signin. No app creation form was visible."
+        }
+      ],
+      "safe_actions_attempted": [
+        "Fetched the app management page with a plain HTTP GET while signed out (no JavaScript execution, no form interaction)."
+      ],
+      "observations": [
+        "App creation is behind sign-in.",
+        "The creation flow (Blank app → name → workspace → Create) in this guide comes from Slack's quickstart documentation, not from direct portal observation."
+      ],
+      "inaccessible_steps": [
+        "App creation, OAuth & Permissions settings, App Credentials and Manage Distribution all require sign-in."
+      ],
+      "stop_reason": "Sign-in required. Logging in is outside what the research agent may do.",
+      "human_handoff": "Sign in to Slack, open https://api.slack.com/apps?new_app=1, choose \"Blank app\", enter the app name, select your development workspace and click Create; then configure OAuth & Permissions.",
+      "sandbox_or_test_mode": "No sandbox or developer-program test environment was found in the fetched pages. The closest equivalent is the development workspace you select when creating the app.",
+      "source_ids": ["slack-portal", "slack-quickstart"]
+    },
+    "composio_managed_oauth": {
+      "availability": "conditional",
+      "own_app_required": "conditional",
+      "explanation": "Composio's Slack toolkit page states \"Composio-managed OAuth available? Yes\", but also says Composio is working on Marketplace review for the managed Slack app and, until that review is complete, recommends using the workspace's own Slack OAuth app. Some workspaces may block installing the managed app.",
+      "when_to_bring_own_app": [
+        "Until Composio's managed Slack app completes Marketplace review (per Composio's FAQ).",
+        "The target workspace restricts which apps can be installed.",
+        "You want your own app name on the consent screen, custom scopes, or a dedicated rate-limit quota."
+      ],
+      "evidence_label": "verified",
+      "source_ids": ["cmp-slack", "cmp-catalog", "cmp-custom-vs-managed"]
+    },
+    "common_issues": [
+      { "issue": "bad_redirect_uri", "explanation": "Multiple redirect URL values are configured and the ones sent do not match.", "resolution": "Send the same redirect_uri in both the authorize step and the oauth.v2.access step, and make sure it matches (or is a subdirectory of) a configured Redirect URL.", "source_ids": ["slack-oauth"] },
+      { "issue": "invalid_scope", "explanation": "A requested scope does not exist or the requested scopes conflict.", "resolution": "Check scope names against Slack's scope reference and remove conflicting scopes.", "source_ids": ["slack-oauth", "slack-scopes"] },
+      { "issue": "unapproved_scope", "explanation": "Installing into a workspace where the requested scopes are not approved by its admins.", "resolution": "The workspace's owners or app managers must approve the app and its scopes.", "source_ids": ["slack-oauth", "slack-admin-approval"] },
+      { "issue": "invalid_team_for_non_distributed_app", "explanation": "Another workspace tries to install an app that has not been distributed.", "resolution": "Activate public distribution under Manage Distribution.", "source_ids": ["slack-oauth", "slack-distribution"] },
+      { "issue": "Token rotation enabled by mistake", "explanation": "Token rotation cannot be turned off once enabled; tokens then expire every 12 hours.", "resolution": "Implement refresh with oauth.v2.access (grant_type=refresh_token) before enabling rotation.", "source_ids": ["slack-rotation"] }
+    ],
+    "sources": [
+      { "id": "slack-oauth", "title": "Installing with OAuth", "url": "https://docs.slack.dev/authentication/installing-with-oauth", "domain": "docs.slack.dev", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "slack-quickstart", "title": "Quickstart: app settings", "url": "https://docs.slack.dev/app-management/quickstart-app-settings", "domain": "docs.slack.dev", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "slack-scopes", "title": "Scopes reference", "url": "https://docs.slack.dev/reference/scopes", "domain": "docs.slack.dev", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "slack-distribution", "title": "Distributing your app", "url": "https://docs.slack.dev/app-management/distribution", "domain": "docs.slack.dev", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "slack-review", "title": "Slack Marketplace review guide", "url": "https://docs.slack.dev/slack-marketplace/slack-marketplace-review-guide", "domain": "docs.slack.dev", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "slack-security", "title": "Security best practices", "url": "https://docs.slack.dev/concepts/security", "domain": "docs.slack.dev", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "slack-rotation", "title": "Using token rotation", "url": "https://docs.slack.dev/authentication/using-token-rotation", "domain": "docs.slack.dev", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "slack-admin-approval", "title": "Manage app approval for your workspace", "url": "https://slack.com/help/articles/222386767-Manage-app-approval-for-your-workspace", "domain": "slack.com", "source_type": "official_provider_support", "accessed_at": "2026-11-04" },
+      { "id": "slack-portal", "title": "Slack – Your Apps (portal entry page)", "url": "https://api.slack.com/apps", "domain": "api.slack.com", "source_type": "official_provider_portal", "accessed_at": "2026-11-04" },
+      { "id": "cmp-slack", "title": "Composio – Slack toolkit", "url": "https://docs.composio.dev/toolkits/slack", "domain": "docs.composio.dev", "source_type": "official_composio_docs", "accessed_at": "2026-11-04" },
+      { "id": "cmp-catalog", "title": "Composio – Managed auth catalog", "url": "https://docs.composio.dev/toolkits/managed-auth", "domain": "docs.composio.dev", "source_type": "official_composio_docs", "accessed_at": "2026-11-04" },
+      { "id": "cmp-custom-vs-managed", "title": "Composio – Custom app vs managed app", "url": "https://docs.composio.dev/docs/authentication/custom-app-vs-managed-app", "domain": "docs.composio.dev", "source_type": "official_composio_docs", "accessed_at": "2026-11-04" }
+    ],
+    "evidence_notes": [
+      { "claim": "Unlisted distribution to other workspaces does not require Marketplace review.", "evidence_label": "verified", "verification_basis": "documentation", "source_ids": ["slack-distribution"] },
+      { "claim": "Marketplace submission requires 10+ active workspace installs.", "evidence_label": "verified", "verification_basis": "documentation", "source_ids": ["slack-review"] },
+      { "claim": "Marketplace review: preliminary up to 10 business days; functional up to 10 weeks (new) / 6 weeks (resubmission).", "evidence_label": "verified", "verification_basis": "documentation", "source_ids": ["slack-review"] },
+      { "claim": "Workspace-admin approval wait time.", "evidence_label": "unknown", "verification_basis": null, "source_ids": ["slack-admin-approval"] },
+      { "claim": "Token rotation cannot be turned off once enabled.", "evidence_label": "verified", "verification_basis": "documentation", "source_ids": ["slack-rotation"] },
+      { "claim": "Active setup effort of 30–90 minutes.", "evidence_label": "estimated", "verification_basis": null, "source_ids": [] },
+      { "claim": "Composio's managed Slack app is pending Marketplace review; Composio recommends the workspace's own app until then.", "evidence_label": "verified", "verification_basis": "documentation", "source_ids": ["cmp-slack"] }
+    ],
+    "tested_status": {
+      "status": "not_tested",
+      "notes": "No Slack app was created and no installation was performed. All Verified labels are documentation-based."
+    },
+    "last_researched_at": "2026-11-04",
+    "checklist_items": [
+      { "id": "slack-01-workspace", "label": "Pick a development workspace", "source_ids": ["slack-quickstart"] },
+      { "id": "slack-02-create", "label": "Create the app (Blank app) at api.slack.com/apps", "source_ids": ["slack-quickstart"] },
+      { "id": "slack-03-scopes", "label": "Add the minimum bot (and user) scopes", "source_ids": ["slack-quickstart", "slack-scopes"] },
+      { "id": "slack-04-redirect", "label": "Add an HTTPS Redirect URL under OAuth & Permissions", "source_ids": ["slack-oauth"] },
+      { "id": "slack-05-secret", "label": "Store the client secret in backend environment variables", "source_ids": ["slack-oauth"] },
+      { "id": "slack-06-flow", "label": "Implement authorize redirect (with state) and oauth.v2.access exchange", "source_ids": ["slack-oauth"] },
+      { "id": "slack-07-rotation", "label": "Decide on token rotation (irreversible)", "source_ids": ["slack-rotation"] },
+      { "id": "slack-08-distribute", "label": "Complete the checklist and activate public distribution", "source_ids": ["slack-distribution"] },
+      { "id": "slack-09-admin", "label": "Plan for workspaces that require admin app approval", "source_ids": ["slack-admin-approval"] },
+      { "id": "slack-10-marketplace", "label": "(Optional) Prepare a Marketplace submission after 10+ active installs", "source_ids": ["slack-review"] }
+    ]
+  }
+}

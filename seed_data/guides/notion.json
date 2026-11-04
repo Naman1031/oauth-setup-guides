@@ -1,0 +1,214 @@
+{
+  "slug": "notion",
+  "name": "Notion",
+  "category": "Productivity",
+  "short_description": "Create a public Notion connection that uses OAuth so users can share pages and databases with your product.",
+  "guide_content": {
+    "schema_version": 1,
+    "application_name": "Notion",
+    "website_url": "https://www.notion.com",
+    "oauth_status": "supported",
+    "summary": "Notion public connections (formerly \"public integrations\") use OAuth 2.0. Each user runs the flow individually and picks which pages and databases to share with your connection. Notion uses capabilities (read, update, insert content, comments, user info) instead of scope strings. Marketplace listing is optional and requires a Notion security review; OAuth works without it.",
+    "complexity": "easy",
+    "complexity_rationale": "One connection-creation form (name, workspace, redirect URIs, installation scope, capabilities) and a standard code exchange. No review is needed for OAuth to work. Main gotcha: the installation scope cannot be changed after creation, and users must share pages in the page picker.",
+    "prerequisites": [
+      {
+        "id": "notion-pre-account",
+        "title": "A Notion account and a development workspace",
+        "description": "Creating a connection asks for a connection name and a development workspace.",
+        "evidence_label": "verified",
+        "source_ids": ["notion-public"]
+      },
+      {
+        "id": "notion-pre-scope",
+        "title": "Decide the installation scope up front",
+        "description": "\"Any workspace\" makes a public connection (Marketplace-eligible). Selecting specific workspaces makes a scoped OAuth integration, which cannot be listed on the Marketplace. The scope cannot be changed after creation.",
+        "evidence_label": "verified",
+        "source_ids": ["notion-public", "notion-oauth-int"]
+      },
+      {
+        "id": "notion-pre-redirect",
+        "title": "A redirect URI on your backend",
+        "description": "Users are redirected here after authorizing your connection.",
+        "evidence_label": "verified",
+        "source_ids": ["notion-auth"]
+      }
+    ],
+    "setup_steps": [
+      {
+        "id": "notion-step-create",
+        "title": "Create the connection in the Developer portal",
+        "description": "Signed in, open the Developer portal → Build → Connections → \"Create new connection\". Enter the connection name, development workspace, redirect URI(s), installation scope and capabilities.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["notion-public"]
+      },
+      {
+        "id": "notion-step-credentials",
+        "title": "Copy the OAuth client ID and client secret",
+        "description": "Open the connection's Configuration tab. It shows the OAuth client ID, client secret and the authorization URL. Store the secret in backend environment variables.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["notion-public", "notion-auth"]
+      },
+      {
+        "id": "notion-step-authorize",
+        "title": "Send users to the authorization URL",
+        "description": "Use https://api.notion.com/v1/oauth/authorize with client_id, redirect_uri, response_type=code, owner=user, and an optional state. The user picks the pages and databases to share.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["notion-auth"]
+      },
+      {
+        "id": "notion-step-exchange",
+        "title": "Exchange the code for tokens",
+        "description": "POST to https://api.notion.com/v1/oauth/token with HTTP Basic auth (base64 of CLIENT_ID:CLIENT_SECRET) and JSON {grant_type: \"authorization_code\", code, redirect_uri}. redirect_uri is required if you have more than one URI or included it in the authorize URL. The token API reference lists a Notion-Version header as required.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["notion-auth", "notion-token"]
+      },
+      {
+        "id": "notion-step-refresh",
+        "title": "Handle refresh",
+        "description": "POST to the same token endpoint with grant_type=refresh_token. Refreshing returns a new access token and a new refresh token. The fetched docs do not state an access-token lifetime.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["notion-auth", "notion-refresh"]
+      },
+      {
+        "id": "notion-step-marketplace",
+        "title": "(Optional) Submit a Marketplace listing",
+        "description": "Only \"Any workspace\" connections are eligible. Go to Listings → Connections → \"Start a new connection listing\" → \"Submit for review\". Public connections work without a listing.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["notion-marketplace", "notion-public"]
+      }
+    ],
+    "permissions_scopes": [
+      { "name": "Read content", "explanation": "Read existing content (e.g. retrieve a database, but not update it).", "is_conditional": true, "condition_note": "Needed if your product reads pages or databases.", "evidence_label": "verified", "source_ids": ["notion-capabilities"] },
+      { "name": "Update content", "explanation": "Update existing content (e.g. update a page, but not create pages).", "is_conditional": true, "condition_note": "Needed if your product edits content.", "evidence_label": "verified", "source_ids": ["notion-capabilities"] },
+      { "name": "Insert content", "explanation": "Create new content. Does not by itself grant reading full objects.", "is_conditional": true, "condition_note": "Needed if your product creates pages or rows.", "evidence_label": "verified", "source_ids": ["notion-capabilities"] },
+      { "name": "Read comments / Insert comments", "explanation": "Read comments on pages or blocks / add comments to pages or existing discussions.", "is_conditional": true, "condition_note": "Only if your product works with comments.", "evidence_label": "verified", "source_ids": ["notion-capabilities"] },
+      { "name": "User information (none / without email / with email)", "explanation": "Controls access to User objects and the list/retrieve user endpoints. \"With email addresses\" is the broadest; choose it only if you need emails.", "is_conditional": true, "condition_note": "Pick the lowest level your product needs.", "evidence_label": "verified", "source_ids": ["notion-capabilities"] }
+    ],
+    "credentials_configuration": [
+      { "name": "OAuth client ID", "description": "Identifies your public connection in the authorize URL and token requests.", "where_obtained": "Connection → Configuration tab.", "is_secret": false, "evidence_label": "verified", "source_ids": ["notion-public"] },
+      { "name": "OAuth client secret", "description": "Used with the client ID for HTTP Basic auth on the token endpoint.", "where_obtained": "Connection → Configuration tab. Store it only on your backend.", "is_secret": true, "evidence_label": "verified", "source_ids": ["notion-public", "notion-auth"] },
+      { "name": "Redirect URI(s)", "description": "Where users land after authorizing; must match what you send in redirect_uri.", "where_obtained": "Entered when creating the connection.", "is_secret": false, "evidence_label": "verified", "source_ids": ["notion-auth", "notion-token"] },
+      { "name": "Installation scope", "description": "Any workspace (public) vs selected workspaces (scoped OAuth). Cannot be changed after creation.", "where_obtained": "Chosen when creating the connection.", "is_secret": false, "evidence_label": "verified", "source_ids": ["notion-public", "notion-oauth-int"] },
+      { "name": "Capabilities", "description": "What your connection can do. Changing them on a public connection requires users to re-authenticate.", "where_obtained": "Connection settings.", "is_secret": false, "evidence_label": "verified", "source_ids": ["notion-capabilities"] }
+    ],
+    "time_approval": {
+      "active_effort_min_minutes": 15,
+      "active_effort_max_minutes": 45,
+      "active_effort_label": "estimated",
+      "active_effort_basis": "Creating one connection, choosing capabilities and redirect URIs, and recording credentials. Excludes integration code and Marketplace listing preparation. Not published by Notion.",
+      "review_requirement": "conditional",
+      "review_requirement_explanation": "No review is required for OAuth to work. A Notion security review is required only to list a public connection on the Notion Marketplace.",
+      "review_source_ids": ["notion-auth", "notion-public", "notion-marketplace"],
+      "review_wait": {
+        "evidence_label": "verified",
+        "summary": "Marketplace listing only (optional): Notion says to expect to hear back within 5–10 business days via email.",
+        "source_ids": ["notion-marketplace"]
+      },
+      "elapsed_time_note": "Without a Marketplace listing, elapsed time is about the active effort. A listing adds Notion's published 5–10 business-day response window (and possible resubmission)."
+    },
+    "agent_human_tasks": {
+      "agent_can_do": [
+        "Find and compare Notion's authorization, capabilities, token and Marketplace documentation.",
+        "Explain the public vs scoped OAuth choice before you commit to it.",
+        "Prepare a minimal capability set and a suggested redirect URI format.",
+        "Attempt to view the integrations page without signing in and record the result.",
+        "Prepare this checklist."
+      ],
+      "human_must_do": [
+        "Sign in to Notion and create the connection in the Developer portal.",
+        "Choose the installation scope (irreversible) and capabilities.",
+        "Copy and securely store the client secret.",
+        "Submit a Marketplace listing if desired.",
+        "Note: each end user separately authorizes your connection and chooses which pages to share."
+      ]
+    },
+    "portal_exploration": {
+      "status": "not_accessible",
+      "entry_point_url": "https://www.notion.so/profile/integrations",
+      "pages_inspected": [
+        {
+          "url": "https://www.notion.so/profile/integrations",
+          "observation": "Redirected (HTTP 307) to https://app.notion.com/profile/integrations. The response body contained only the text \"Notion\": no login prompt and no integration content, which indicates a JavaScript-rendered app shell."
+        }
+      ],
+      "safe_actions_attempted": [
+        "Fetched the integrations page with a plain HTTP GET while signed out, following one same-vendor redirect (no JavaScript execution)."
+      ],
+      "observations": [
+        "The page's content is rendered by JavaScript and was not visible to the research fetch.",
+        "Notion's current docs point to a Developer portal (Build → Connections); the fields in this guide come from documentation."
+      ],
+      "inaccessible_steps": [
+        "Connection creation and the Configuration tab (client ID / secret) require a signed-in Notion account."
+      ],
+      "stop_reason": "Portal content is JavaScript-rendered and account-bound; no further safe exploration was possible without logging in.",
+      "human_handoff": "Sign in to Notion, open the Developer portal → Build → Connections, click \"Create new connection\", choose the installation scope and capabilities, and add your redirect URI.",
+      "sandbox_or_test_mode": "No sandbox or test mode was found in the fetched docs; use a development workspace you own.",
+      "source_ids": ["notion-portal", "notion-public"]
+    },
+    "composio_managed_oauth": {
+      "availability": "available",
+      "own_app_required": "conditional",
+      "explanation": "Composio's Notion toolkit page lists OAUTH2 and API_KEY and states \"Composio-managed OAuth available? Yes\". Its FAQ strongly recommends using your own Notion app for production integrations, because Notion shows the integration's own name and logo and attributes actions to it.",
+      "when_to_bring_own_app": [
+        "Production Notion integrations (Composio's own recommendation).",
+        "You want your product's name and logo shown in Notion.",
+        "You need a dedicated rate-limit quota."
+      ],
+      "evidence_label": "verified",
+      "source_ids": ["cmp-notion", "cmp-catalog", "cmp-custom-vs-managed"]
+    },
+    "common_issues": [
+      { "issue": "object_not_found (404)", "explanation": "Often means the page or database was not shared with your connection.", "resolution": "Have the user share the page in the page picker (or via \"Add connections\"). Parent pages share their children.", "source_ids": ["notion-status", "notion-auth"] },
+      { "issue": "invalid_grant (400) on token exchange", "explanation": "The code or refresh token is invalid, expired, revoked, doesn't match the redirect URI used, or was issued to another client.", "resolution": "Restart the flow and send the same redirect_uri you used in the authorization request.", "source_ids": ["notion-token"] },
+      { "issue": "unauthorized (401)", "explanation": "The bearer token is not valid.", "resolution": "Refresh the token or have the user re-authorize.", "source_ids": ["notion-status"] },
+      { "issue": "Pages selected but no access", "explanation": "If the user clicks Allow access but the rest of the flow isn't completed, the connection does not get access to the selected pages.", "resolution": "Make sure your callback completes the token exchange.", "source_ids": ["notion-auth"] },
+      { "issue": "Users must re-authenticate after capability changes", "explanation": "Changing a public connection's capabilities requires users to re-authenticate.", "resolution": "Decide capabilities carefully before launch.", "source_ids": ["notion-capabilities"] }
+    ],
+    "sources": [
+      { "id": "notion-auth", "title": "Authorization", "url": "https://developers.notion.com/guides/authorization/overview", "domain": "developers.notion.com", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "notion-public", "title": "Public integrations overview", "url": "https://developers.notion.com/guides/connections-and-tokens/public-integrations/overview", "domain": "developers.notion.com", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "notion-oauth-int", "title": "OAuth integrations overview", "url": "https://developers.notion.com/guides/connections-and-tokens/oauth-integrations/overview", "domain": "developers.notion.com", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "notion-marketplace", "title": "Marketplace listing", "url": "https://developers.notion.com/guides/connections-and-tokens/public-integrations/marketplace-listing", "domain": "developers.notion.com", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "notion-capabilities", "title": "Capabilities", "url": "https://developers.notion.com/reference/capabilities", "domain": "developers.notion.com", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "notion-token", "title": "Create a token", "url": "https://developers.notion.com/reference/create-a-token", "domain": "developers.notion.com", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "notion-refresh", "title": "Refresh a token", "url": "https://developers.notion.com/reference/refresh-a-token", "domain": "developers.notion.com", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "notion-status", "title": "Status codes", "url": "https://developers.notion.com/reference/status-codes", "domain": "developers.notion.com", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "notion-portal", "title": "Notion – Integrations (portal entry page)", "url": "https://www.notion.so/profile/integrations", "domain": "www.notion.so", "source_type": "official_provider_portal", "accessed_at": "2026-11-04" },
+      { "id": "cmp-notion", "title": "Composio – Notion toolkit", "url": "https://docs.composio.dev/toolkits/notion", "domain": "docs.composio.dev", "source_type": "official_composio_docs", "accessed_at": "2026-11-04" },
+      { "id": "cmp-catalog", "title": "Composio – Managed auth catalog", "url": "https://docs.composio.dev/toolkits/managed-auth", "domain": "docs.composio.dev", "source_type": "official_composio_docs", "accessed_at": "2026-11-04" },
+      { "id": "cmp-custom-vs-managed", "title": "Composio – Custom app vs managed app", "url": "https://docs.composio.dev/docs/authentication/custom-app-vs-managed-app", "domain": "docs.composio.dev", "source_type": "official_composio_docs", "accessed_at": "2026-11-04" }
+    ],
+    "evidence_notes": [
+      { "claim": "Marketplace submission or review is not required for OAuth to work.", "evidence_label": "verified", "verification_basis": "documentation", "source_ids": ["notion-auth", "notion-public"] },
+      { "claim": "Marketplace review response within 5–10 business days.", "evidence_label": "verified", "verification_basis": "documentation", "source_ids": ["notion-marketplace"] },
+      { "claim": "Installation scope cannot be changed after creation.", "evidence_label": "verified", "verification_basis": "documentation", "source_ids": ["notion-public", "notion-oauth-int"] },
+      { "claim": "Access-token lifetime.", "evidence_label": "unknown", "verification_basis": null, "source_ids": [] },
+      { "claim": "Active setup effort of 15–45 minutes.", "evidence_label": "estimated", "verification_basis": null, "source_ids": [] },
+      { "claim": "Composio-managed OAuth is available for Notion; Composio recommends your own app for production.", "evidence_label": "verified", "verification_basis": "documentation", "source_ids": ["cmp-notion"] }
+    ],
+    "tested_status": {
+      "status": "not_tested",
+      "notes": "No Notion connection was created and no authorization flow was run. All Verified labels are documentation-based."
+    },
+    "last_researched_at": "2026-11-04",
+    "checklist_items": [
+      { "id": "notion-01-scope", "label": "Decide installation scope: Any workspace vs selected workspaces", "source_ids": ["notion-public"] },
+      { "id": "notion-02-capabilities", "label": "Pick the minimum capabilities", "source_ids": ["notion-capabilities"] },
+      { "id": "notion-03-create", "label": "Create the connection in the Developer portal", "source_ids": ["notion-public"] },
+      { "id": "notion-04-secret", "label": "Store the OAuth client secret in backend environment variables", "source_ids": ["notion-public"] },
+      { "id": "notion-05-authorize", "label": "Implement the authorize redirect with state", "source_ids": ["notion-auth"] },
+      { "id": "notion-06-exchange", "label": "Implement the token exchange with Basic auth", "source_ids": ["notion-auth", "notion-token"] },
+      { "id": "notion-07-refresh", "label": "Implement refresh-token handling", "source_ids": ["notion-refresh"] },
+      { "id": "notion-08-sharing", "label": "Explain page sharing to users (page picker)", "source_ids": ["notion-auth"] },
+      { "id": "notion-09-marketplace", "label": "(Optional) Submit a Marketplace listing", "source_ids": ["notion-marketplace"] }
+    ]
+  }
+}

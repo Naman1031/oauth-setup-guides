@@ -1,0 +1,333 @@
+{
+  "slug": "github",
+  "name": "GitHub",
+  "category": "Developer tools",
+  "short_description": "Register a GitHub OAuth app so your users can authorize access to their GitHub account and repositories.",
+  "guide_content": {
+    "schema_version": 1,
+    "application_name": "GitHub",
+    "website_url": "https://github.com",
+    "oauth_status": "supported",
+    "summary": "GitHub supports OAuth 2.0 through OAuth apps registered under a personal account or an organization. Registration is a single settings form with no provider review. GitHub's own docs generally recommend GitHub Apps over OAuth apps; this guide covers OAuth apps, which GitHub still documents and supports.",
+    "complexity": "easy",
+    "complexity_rationale": "One registration form (name, homepage URL, callback URL), no provider review or verification step found in the docs, and a standard authorization-code flow with PKCE. The only conditional blocker is organization-level approval when an organization has OAuth app access restrictions enabled.",
+    "prerequisites": [
+      {
+        "id": "gh-pre-account",
+        "title": "A GitHub account (or org admin access)",
+        "description": "You can register an OAuth app under your personal account or under any organization where you have administrative access. A user or organization can own up to 100 OAuth apps.",
+        "evidence_label": "verified",
+        "source_ids": ["gh-create"]
+      },
+      {
+        "id": "gh-pre-app-type",
+        "title": "Decide: OAuth app or GitHub App",
+        "description": "GitHub states that GitHub Apps are generally preferred (fine-grained permissions, user-selected repositories, short-lived tokens). An OAuth app is the preferred choice when you need enterprise-level resources.",
+        "evidence_label": "verified",
+        "source_ids": ["gh-diff"]
+      },
+      {
+        "id": "gh-pre-urls",
+        "title": "Your homepage URL and callback URL(s)",
+        "description": "The registration form asks for the full URL of your app's website and the authorization callback URL your server will receive the code on. Up to 10 callback URLs can be entered.",
+        "evidence_label": "verified",
+        "source_ids": ["gh-create"]
+      }
+    ],
+    "setup_steps": [
+      {
+        "id": "gh-step-open",
+        "title": "Open the OAuth app registration page",
+        "description": "Signed in to GitHub: profile picture → Settings → Developer settings → OAuth apps → New OAuth App (shown as \"Register a new application\" if you have none yet).",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["gh-create"]
+      },
+      {
+        "id": "gh-step-form",
+        "title": "Fill in the registration form",
+        "description": "Enter the Application name, Homepage URL, an optional Application description, and the Authorization callback URL (up to 10). Only tick \"Enable Device Flow\" if your app uses the device flow.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["gh-create"]
+      },
+      {
+        "id": "gh-step-expiry",
+        "title": "Decide on expiring user tokens",
+        "description": "\"Expire user access tokens\" is enabled by default. With it on, access tokens expire after eight hours and refresh tokens after six months without use, so your code must handle refresh. Untick it only if your code cannot yet handle short-lived tokens.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["gh-create", "gh-auth"]
+      },
+      {
+        "id": "gh-step-register",
+        "title": "Register the app and collect credentials",
+        "description": "Click \"Register application\". Record the client ID and obtain a client secret from the app's settings; store the secret only in your backend's environment. The fetched docs do not describe the exact secret-generation screen, so confirm it in the UI.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["gh-create", "gh-auth"]
+      },
+      {
+        "id": "gh-step-authorize",
+        "title": "Send users to the authorize URL",
+        "description": "Redirect users to GET https://github.com/login/oauth/authorize with client_id, redirect_uri (must match a registered callback URL), scope (space-delimited), an unguessable state value, and a PKCE code_challenge with code_challenge_method=S256.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["gh-auth"]
+      },
+      {
+        "id": "gh-step-exchange",
+        "title": "Exchange the code for a token on your server",
+        "description": "POST to https://github.com/login/oauth/access_token with client_id, client_secret, code, redirect_uri and code_verifier. Send \"Accept: application/json\" to get JSON. The code expires after 10 minutes; check that state matches what you sent.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["gh-auth"]
+      },
+      {
+        "id": "gh-step-org",
+        "title": "(Conditional) Get organization owner approval",
+        "description": "If your users need access to an organization's resources and that organization has OAuth app access restrictions enabled (the default for new organizations), a member must request approval and an organization owner must approve your app.",
+        "responsibility": "human",
+        "evidence_label": "verified",
+        "source_ids": ["gh-restrict"]
+      }
+    ],
+    "permissions_scopes": [
+      {
+        "name": "(no scope)",
+        "explanation": "Read-only access to public information, including user profile info, repository info, and gists.",
+        "is_conditional": false,
+        "condition_note": null,
+        "evidence_label": "verified",
+        "source_ids": ["gh-scopes"]
+      },
+      {
+        "name": "read:user",
+        "explanation": "Read a user's profile data.",
+        "is_conditional": true,
+        "condition_note": "Only if you need profile data beyond public info.",
+        "evidence_label": "verified",
+        "source_ids": ["gh-scopes"]
+      },
+      {
+        "name": "user:email",
+        "explanation": "Read access to a user's email addresses.",
+        "is_conditional": true,
+        "condition_note": "Only if your product needs the user's email.",
+        "evidence_label": "verified",
+        "source_ids": ["gh-scopes"]
+      },
+      {
+        "name": "public_repo",
+        "explanation": "Access limited to public repositories.",
+        "is_conditional": true,
+        "condition_note": "Use instead of repo when you only work with public repositories.",
+        "evidence_label": "verified",
+        "source_ids": ["gh-scopes"]
+      },
+      {
+        "name": "repo",
+        "explanation": "Full read/write access to public AND private repositories (code, commit statuses, invitations, collaborators, deployment statuses, webhooks). This is broad: request it only if you need private repository data. OAuth apps need it for issues and pull requests in private repos. GitHub Apps offer finer-grained permissions.",
+        "is_conditional": true,
+        "condition_note": "Only when private repository access is genuinely required.",
+        "evidence_label": "verified",
+        "source_ids": ["gh-scopes", "gh-diff"]
+      },
+      {
+        "name": "read:org",
+        "explanation": "Read-only access to organization membership, organization projects, and team membership.",
+        "is_conditional": true,
+        "condition_note": "Only if you read organization or team data.",
+        "evidence_label": "verified",
+        "source_ids": ["gh-scopes"]
+      },
+      {
+        "name": "offline_access",
+        "explanation": "Requests an expiring access token plus a refresh token, even if the app is not configured for expiring tokens.",
+        "is_conditional": true,
+        "condition_note": "Only if you want refresh tokens without enabling expiry app-wide.",
+        "evidence_label": "verified",
+        "source_ids": ["gh-scopes"]
+      }
+    ],
+    "credentials_configuration": [
+      {
+        "name": "Client ID",
+        "description": "Public identifier for your OAuth app, sent in the authorize and token requests.",
+        "where_obtained": "The OAuth app's settings page after registration.",
+        "is_secret": false,
+        "evidence_label": "verified",
+        "source_ids": ["gh-auth"]
+      },
+      {
+        "name": "Client secret",
+        "description": "Confidential value used only in the server-side token exchange and refresh requests. Not needed for the device flow.",
+        "where_obtained": "The OAuth app's settings page after registration (exact screen not described in the fetched docs). Keep it in backend environment variables; never in frontend code.",
+        "is_secret": true,
+        "evidence_label": "verified",
+        "source_ids": ["gh-auth"]
+      },
+      {
+        "name": "Authorization callback URL",
+        "description": "Where GitHub redirects users with the code. redirect_uri must match a registered callback URL; if omitted, GitHub uses the first one.",
+        "where_obtained": "Entered by you in the registration form (up to 10).",
+        "is_secret": false,
+        "evidence_label": "verified",
+        "source_ids": ["gh-create", "gh-auth"]
+      },
+      {
+        "name": "Expire user access tokens setting",
+        "description": "Controls whether user tokens expire (8 hours) with refresh tokens (6 months unused). Enabled by default.",
+        "where_obtained": "Checkbox in the registration form / app settings.",
+        "is_secret": false,
+        "evidence_label": "verified",
+        "source_ids": ["gh-create", "gh-auth"]
+      }
+    ],
+    "time_approval": {
+      "active_effort_min_minutes": 10,
+      "active_effort_max_minutes": 30,
+      "active_effort_label": "estimated",
+      "active_effort_basis": "Covers registration and configuration only (one form with about four fields, recording credentials). Excludes writing and testing your integration code. Not published by GitHub.",
+      "review_requirement": "not_generally_required",
+      "review_requirement_explanation": "No provider review or verification step for OAuth app registration was found in GitHub's OAuth app documentation. Separately, organization owners may need to approve your app if an organization has OAuth app access restrictions enabled; that is an organization decision, not a GitHub review.",
+      "review_source_ids": ["gh-create", "gh-restrict"],
+      "review_wait": {
+        "evidence_label": "unknown",
+        "summary": "No provider review found, so no provider wait. Organization-owner approval time (when required) depends on the organization; GitHub publishes no timeframe.",
+        "source_ids": ["gh-restrict"]
+      },
+      "elapsed_time_note": "Total elapsed time is usually close to the active effort, plus any organization-owner approval time (Unknown) if your users need organization resources."
+    },
+    "agent_human_tasks": {
+      "agent_can_do": [
+        "Find and compare GitHub's official OAuth app documentation.",
+        "Extract the registration form fields, endpoints, and scope descriptions.",
+        "Prepare suggested values, e.g. a callback URL format such as https://your-backend.example.com/oauth/github/callback.",
+        "Attempt to view the registration page without signing in and record what is visible.",
+        "Prepare this checklist."
+      ],
+      "human_must_do": [
+        "Sign in to GitHub and register the OAuth app.",
+        "Obtain and securely store the client secret.",
+        "Choose the scopes your product actually needs.",
+        "Request organization-owner approval where OAuth app access restrictions apply.",
+        "Implement and test the authorization flow in your own product.",
+        "Note: your end users separately authorize (consent to) your app; that is not part of app registration."
+      ]
+    },
+    "portal_exploration": {
+      "status": "not_accessible",
+      "entry_point_url": "https://github.com/settings/applications/new",
+      "pages_inspected": [
+        {
+          "url": "https://github.com/settings/applications/new",
+          "observation": "Without a session, GitHub served its sign-in page (username/email, password, passkey option, \"Create an account\" link) at this URL. No registration form fields were visible."
+        }
+      ],
+      "safe_actions_attempted": [
+        "Fetched the registration URL with a plain HTTP GET while signed out (no JavaScript execution, no form interaction)."
+      ],
+      "observations": [
+        "The registration form is behind sign-in.",
+        "The form fields listed in this guide come from GitHub's documentation, not from direct observation of the portal."
+      ],
+      "inaccessible_steps": [
+        "Registration form and the app's settings page (client ID / secret) require a signed-in GitHub account."
+      ],
+      "stop_reason": "Sign-in required. Logging in is outside what the research agent may do.",
+      "human_handoff": "Sign in to GitHub, open https://github.com/settings/applications/new, enter the application name, homepage URL and callback URL, and click \"Register application\".",
+      "sandbox_or_test_mode": "No sandbox or test mode was found in the fetched docs. GitHub documents a non-web application flow intended for cases such as testing.",
+      "source_ids": ["gh-portal", "gh-auth"]
+    },
+    "composio_managed_oauth": {
+      "availability": "available",
+      "own_app_required": "no",
+      "explanation": "Composio's GitHub toolkit page lists OAUTH2 and states \"Composio-managed OAuth available? Yes\", and the managed-auth catalog lists GitHub. With managed auth you do not register your own OAuth app.",
+      "when_to_bring_own_app": [
+        "You want your own app name on the consent screen (branding).",
+        "You need custom scopes.",
+        "You need a dedicated rate-limit quota (managed apps share quota across Composio users).",
+        "You need polling faster than managed auth's 2-minute minimum interval.",
+        "You prefer a GitHub App: Composio's FAQ says you can configure your own GitHub App's client ID and secret."
+      ],
+      "evidence_label": "verified",
+      "source_ids": ["cmp-github", "cmp-catalog", "cmp-custom-vs-managed"]
+    },
+    "common_issues": [
+      {
+        "issue": "redirect_uri_mismatch",
+        "explanation": "The redirect_uri sent does not match a registered callback URL.",
+        "resolution": "Send a redirect_uri that matches what you registered, or omit the parameter to use the first registered callback URL.",
+        "source_ids": ["gh-trouble-auth", "gh-trouble-token"]
+      },
+      {
+        "issue": "bad_verification_code",
+        "explanation": "The code passed to the token endpoint is incorrect or expired (codes expire after 10 minutes).",
+        "resolution": "Start the authorization process again to get a new code.",
+        "source_ids": ["gh-trouble-token", "gh-auth"]
+      },
+      {
+        "issue": "incorrect_client_credentials",
+        "explanation": "The client_id and/or client_secret passed are incorrect.",
+        "resolution": "Double-check both values and how your server sends them.",
+        "source_ids": ["gh-trouble-token"]
+      },
+      {
+        "issue": "unverified_user_email",
+        "explanation": "The user authorizing your app does not have a verified primary email.",
+        "resolution": "The user must verify their primary email address on GitHub.",
+        "source_ids": ["gh-trouble-token"]
+      },
+      {
+        "issue": "application_suspended",
+        "explanation": "GitHub suspended the app (e.g. for abuse or API misuse).",
+        "resolution": "Contact GitHub through the GitHub Support portal.",
+        "source_ids": ["gh-trouble-auth"]
+      },
+      {
+        "issue": "Organization data missing after authorization",
+        "explanation": "The organization has OAuth app access restrictions enabled, so members cannot grant your app access to its resources.",
+        "resolution": "Have a member request approval; an organization owner approves the app.",
+        "source_ids": ["gh-restrict"]
+      }
+    ],
+    "sources": [
+      { "id": "gh-create", "title": "Creating an OAuth app", "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app", "domain": "docs.github.com", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "gh-auth", "title": "Authorizing OAuth apps", "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/authorizing-oauth-apps", "domain": "docs.github.com", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "gh-scopes", "title": "Scopes for OAuth apps", "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/scopes-for-oauth-apps", "domain": "docs.github.com", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "gh-diff", "title": "Differences between GitHub Apps and OAuth apps", "url": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/differences-between-github-apps-and-oauth-apps", "domain": "docs.github.com", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "gh-trouble-auth", "title": "Troubleshooting authorization request errors", "url": "https://docs.github.com/en/apps/oauth-apps/maintaining-oauth-apps/troubleshooting-authorization-request-errors", "domain": "docs.github.com", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "gh-trouble-token", "title": "Troubleshooting OAuth app access token request errors", "url": "https://docs.github.com/en/apps/oauth-apps/maintaining-oauth-apps/troubleshooting-oauth-app-access-token-request-errors", "domain": "docs.github.com", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "gh-restrict", "title": "About OAuth app access restrictions", "url": "https://docs.github.com/en/organizations/managing-oauth-access-to-your-organizations-data/about-oauth-app-access-restrictions", "domain": "docs.github.com", "source_type": "official_provider_docs", "accessed_at": "2026-11-04" },
+      { "id": "gh-portal", "title": "GitHub – Register a new OAuth app (portal entry page)", "url": "https://github.com/settings/applications/new", "domain": "github.com", "source_type": "official_provider_portal", "accessed_at": "2026-11-04" },
+      { "id": "cmp-github", "title": "Composio – GitHub toolkit", "url": "https://docs.composio.dev/toolkits/github", "domain": "docs.composio.dev", "source_type": "official_composio_docs", "accessed_at": "2026-11-04" },
+      { "id": "cmp-catalog", "title": "Composio – Managed auth catalog", "url": "https://docs.composio.dev/toolkits/managed-auth", "domain": "docs.composio.dev", "source_type": "official_composio_docs", "accessed_at": "2026-11-04" },
+      { "id": "cmp-custom-vs-managed", "title": "Composio – Custom app vs managed app", "url": "https://docs.composio.dev/docs/authentication/custom-app-vs-managed-app", "domain": "docs.composio.dev", "source_type": "official_composio_docs", "accessed_at": "2026-11-04" }
+    ],
+    "evidence_notes": [
+      { "claim": "GitHub generally prefers GitHub Apps over OAuth apps; OAuth apps are preferred for enterprise-level resources.", "evidence_label": "verified", "verification_basis": "documentation", "source_ids": ["gh-diff"] },
+      { "claim": "No provider review is required to register an OAuth app.", "evidence_label": "estimated", "verification_basis": null, "source_ids": ["gh-create"] },
+      { "claim": "Expiring user tokens: access token 8 hours, refresh token 6 months without use.", "evidence_label": "verified", "verification_basis": "documentation", "source_ids": ["gh-auth"] },
+      { "claim": "New organizations have OAuth app access restrictions enabled by default.", "evidence_label": "verified", "verification_basis": "documentation", "source_ids": ["gh-restrict"] },
+      { "claim": "Active setup effort of 10–30 minutes.", "evidence_label": "estimated", "verification_basis": null, "source_ids": [] },
+      { "claim": "Composio-managed OAuth is available for GitHub.", "evidence_label": "verified", "verification_basis": "documentation", "source_ids": ["cmp-github", "cmp-catalog"] }
+    ],
+    "tested_status": {
+      "status": "not_tested",
+      "notes": "No OAuth app was registered and no authorization flow was run. All Verified labels are documentation-based."
+    },
+    "last_researched_at": "2026-11-04",
+    "checklist_items": [
+      { "id": "github-01-choose-type", "label": "Decide between an OAuth app and a GitHub App", "source_ids": ["gh-diff"] },
+      { "id": "github-02-prepare-urls", "label": "Prepare homepage URL and callback URL(s)", "source_ids": ["gh-create"] },
+      { "id": "github-03-register", "label": "Register the OAuth app in Developer settings", "source_ids": ["gh-create"] },
+      { "id": "github-04-store-secret", "label": "Store the client secret in backend environment variables", "source_ids": ["gh-auth"] },
+      { "id": "github-05-token-expiry", "label": "Confirm the token-expiry setting and implement refresh if enabled", "source_ids": ["gh-auth"] },
+      { "id": "github-06-authorize", "label": "Implement the authorize redirect with state and PKCE", "source_ids": ["gh-auth"] },
+      { "id": "github-07-exchange", "label": "Implement the server-side code-for-token exchange", "source_ids": ["gh-auth"] },
+      { "id": "github-08-scopes", "label": "Request only the scopes you need", "source_ids": ["gh-scopes"] },
+      { "id": "github-09-org", "label": "Check whether target organizations restrict OAuth app access", "source_ids": ["gh-restrict"] }
+    ]
+  }
+}
