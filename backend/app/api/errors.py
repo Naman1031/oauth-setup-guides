@@ -17,20 +17,21 @@ logger = logging.getLogger(__name__)
 class ApiError(Exception):
     """Raise this from a route to return a specific status code and safe message."""
 
-    def __init__(self, status_code: int, code: str, message: str) -> None:
+    def __init__(self, status_code: int, code: str, message: str, headers: dict[str, str] | None = None) -> None:
         self.status_code = status_code
         self.code = code
         self.message = message
+        self.headers = headers or {}
 
 
-def error_response(status_code: int, code: str, message: str) -> JSONResponse:
-    return JSONResponse(status_code=status_code, content={"error": {"code": code, "message": message}})
+def error_response(status_code: int, code: str, message: str, headers: dict[str, str] | None = None) -> JSONResponse:
+    return JSONResponse(status_code=status_code, content={"error": {"code": code, "message": message}}, headers=headers)
 
 
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ApiError)
     async def handle_api_error(request: Request, exc: ApiError) -> JSONResponse:
-        return error_response(exc.status_code, exc.code, exc.message)
+        return error_response(exc.status_code, exc.code, exc.message, exc.headers)
 
     @app.exception_handler(StarletteHTTPException)
     async def handle_http_error(request: Request, exc: StarletteHTTPException) -> JSONResponse:

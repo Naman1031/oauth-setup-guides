@@ -5,7 +5,7 @@ import type { ApplicationSummary, GuideContent } from '@/types/guide'
 
 // Vite exposes only variables prefixed with VITE_ to browser code, and anything
 // here is PUBLIC (it ends up in the downloaded JavaScript). Never put secrets here.
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000').replace(/\/$/, '')
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000').replace(/\/$/, '')
 
 /** Thrown for network problems and unexpected responses; pages show an error state. */
 export class ApiRequestError extends Error {}

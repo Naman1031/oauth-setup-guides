@@ -3,11 +3,13 @@
 A research and guide tool that helps developers understand the work involved
 in setting up OAuth with third-party providers. See `PROJECT_SPEC.md`.
 
-> Status: **Phase 2 of 4**: frontend + FastAPI backend + Supabase database.
-> The research agent arrives in Phase 3; the full README in Phase 4.
+> Status: **Phase 3 of 4**: frontend + FastAPI backend + Supabase + AI research
+> agent. Deployment and the full README arrive in Phase 4.
 
 ```text
-React (Vite)  ──fetch──▶  FastAPI (/api/...)  ──SQLAlchemy──▶  PostgreSQL (Supabase)
+React (Vite)  ──fetch / SSE──▶  FastAPI (/api/...)  ──SQLAlchemy──▶  PostgreSQL (Supabase)
+                                     │
+                                     └── OpenAI Responses API + built-in web_search
 ```
 
 ## Repository layout
@@ -70,6 +72,7 @@ Set `VITE_API_BASE_URL` in `frontend/.env.local` if the API runs elsewhere.
 | GET | `/api/applications` | Directory cards (published only) |
 | GET | `/api/applications/{slug}` | A pre-built guide, or 404 |
 | GET | `/api/guides/{public_id}` | An unlisted generated guide, or 404 |
+| POST | `/api/research/stream` | Server-Sent Events: `progress`, `activity`, then `complete` or `error` |
 
 Errors always look like `{"error": {"code": "...", "message": "..."}}`.
 
@@ -78,7 +81,16 @@ Errors always look like `{"error": {"code": "...", "message": "..."}}`.
 Add `seed_data/guides/<slug>.json` (same shape as the existing files) and run
 `python -m scripts.seed_applications`. No frontend code or migration is needed.
 
+## Research agent and cost
+
+Set `OPENAI_API_KEY` and `OPENAI_MODEL` in `backend/.env` (see `.env.example`).
+API usage is billed separately from ChatGPT subscriptions. Each research request
+makes **one** OpenAI call with at most `OPENAI_MAX_TOOL_CALLS` web searches
+($10 per 1,000 calls) and `OPENAI_MAX_OUTPUT_TOKENS` output tokens; failures are
+not retried automatically. The first live run (Linear, gpt-6-luna) used 3
+searches, 24k input and 5k output tokens: about **$0.035**. Set a hard spend
+limit under OpenAI Project settings → Limits; spend alerts alone do not stop traffic.
+
 ## Not built yet
 
-- The research form validates input but does not send anything (Phase 3).
 - Deployment configuration (Phase 4).

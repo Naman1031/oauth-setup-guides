@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from 'react'
-import { Info, Search } from 'lucide-react'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Search } from 'lucide-react'
+import { ResearchProgress } from '@/components/ResearchProgress'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useResearch } from '@/hooks/useResearch'
 import { MAX_APP_NAME_LENGTH, MAX_URL_LENGTH, validateResearchInput, type ResearchInputErrors } from '@/lib/researchInput'
 
 export function ResearchForm() {
@@ -11,20 +12,26 @@ export function ResearchForm() {
   const [applicationName, setApplicationName] = useState('')
   const [websiteUrl, setWebsiteUrl] = useState('')
   const [errors, setErrors] = useState<ResearchInputErrors>({})
-  const [notConnectedNotice, setNotConnectedNotice] = useState(false)
+  const research = useResearch()
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault() // stop the browser's default full-page form submission
     const validationErrors = validateResearchInput(applicationName, websiteUrl)
     setErrors(validationErrors)
-    if (Object.keys(validationErrors).length > 0) {
-      setNotConnectedNotice(false)
-      return
-    }
-    // PHASE 1: there is no backend yet, so nothing is sent and no fake
-    // progress is shown. Phase 3 replaces this with the streamed request
-    // to POST /api/research/stream.
-    setNotConnectedNotice(true)
+    if (Object.keys(validationErrors).length > 0) return
+    // The backend re-validates everything; this check is only for quick feedback.
+    void research.start(applicationName, websiteUrl)
+  }
+
+  if (research.state.status !== 'idle') {
+    return (
+      <ResearchProgress
+        applicationName={applicationName.trim()}
+        state={research.state}
+        onRetry={() => void research.start(applicationName, websiteUrl)}
+        onEdit={research.reset}
+      />
+    )
   }
 
   return (
@@ -73,23 +80,13 @@ export function ResearchForm() {
 
       <p className="text-xs text-muted-foreground">
         The research agent only uses public information. It cannot log in, register an OAuth app, or handle credentials,
-        and it will never ask for your client secret.
+        and it will never ask for your client secret. The generated guide gets an unlisted link: anyone with the link can
+        view it.
       </p>
 
       <Button type="submit">
         <Search /> Generate Guide
       </Button>
-
-      {notConnectedNotice && (
-        <Alert>
-          <Info />
-          <AlertTitle>Research agent not connected yet</AlertTitle>
-          <AlertDescription>
-            Your input passed the browser checks, but the research backend is built in a later phase. Nothing was sent
-            and no guide was created.
-          </AlertDescription>
-        </Alert>
-      )}
     </form>
   )
 }

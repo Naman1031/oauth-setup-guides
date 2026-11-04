@@ -9,8 +9,10 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.errors import register_error_handlers
+from app.api.research import router as research_router
 from app.api.routes import router
 from app.core.config import get_settings
+from app.services.research.rate_limit import ResearchRateLimiter
 
 
 def create_app() -> FastAPI:
@@ -42,8 +44,16 @@ def create_app() -> FastAPI:
         response.headers["X-Robots-Tag"] = "noindex, nofollow"
         return response
 
+    # One limiter per server process (see rate_limit.py for the limitation).
+    app.state.research_limiter = ResearchRateLimiter(
+        per_ip_per_hour=settings.research_requests_per_ip_per_hour,
+        per_day=settings.research_requests_per_day,
+        max_concurrent=settings.research_max_concurrent,
+    )
+
     register_error_handlers(app)
     app.include_router(router)
+    app.include_router(research_router)
     return app
 
 
