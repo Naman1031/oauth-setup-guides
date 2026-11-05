@@ -1,6 +1,6 @@
 # Test report
 
-Date: 2026-11-05 · Branch: `phase-4-polish-deploy` · Environment: Windows 11, Python 3.12.2,
+Date: 2026-11-05 · Branch: `main` · Live: https://oauth-setup-guides-azure.vercel.app · Environment: Windows 11, Python 3.12.2,
 Node 26.13, local PostgreSQL 18 (tests), Supabase PostgreSQL 17.11 (data).
 
 Status key: **Pass** = run and observed passing · **Partial** = some evidence, gap noted ·
@@ -10,8 +10,11 @@ Status key: **Pass** = run and observed passing · **Partial** = some evidence, 
 
 | Suite | Command | Result |
 |---|---|---|
-| Backend unit/integration (real PostgreSQL, fake OpenAI) | `cd backend && pytest` | **150 passed** |
+| Backend unit/integration (real PostgreSQL, fake OpenAI) | `cd backend && pytest` | **151 passed** |
 | Migration ↔ models | `alembic check` | No new upgrade operations detected |
+| **End-to-end, LIVE deployment** (Vercel + Render + Supabase) | `python -m scripts.e2e_check --api https://oauth-guides-api-sxqs.onrender.com --frontend https://oauth-setup-guides-azure.vercel.app --guide-id <id> --production` | **33/33 passed** |
+| Clean install (fresh venv from requirements files only) | `pip install -r requirements-dev.txt && pytest` | 150/150 passed |
+| Production mode locally (Render start command, `ENVIRONMENT=production`) | e2e check `--production` | 29/29 passed |
 | End-to-end, local stack (API → Supabase) | `python -m scripts.e2e_check --api http://localhost:8000 --frontend-origin http://localhost:5173 --guide-id <id>` | **28/28 passed** |
 | Frontend type-check + build | `npm run build` | Pass |
 | Frontend lint | `npm run lint` | Pass (2 warnings inside generated shadcn `button`/`badge` files) |
@@ -32,6 +35,7 @@ code is in the shipped bundle (verified by searching `dist/assets/*.js`).
 |---|---|---|
 | Linear (`https://linear.app`), gpt-6-luna | Supported guide saved; all 5 stages streamed; 6/6 cited URLs return 200; 1 unconfirmable source dropped; portal claim downgraded to "not attempted" (no page opened) | 3 searches, 24,436 input / 5,143 output tokens (1,569 reasoning), 56.6 s, **≈ $0.035** |
 | Craigslist (`https://www.craigslist.org`), gpt-6-luna, run by the user from the UI | Guide saved; all 4 sources confirmed. **Fact-checked 9/9 claims against Craigslist's pages** (case-by-case access, eligible categories, phone 415-399-5200 x8283, token URL, `email;accountID:password` Basic auth, scopes, 3600 s token, block credit). **Problem found:** labelled "OAuth supported" because Craigslist documents an OAuth *client_credentials* grant, which only gives access to the poster's own account, with no app registration and no end-user consent. **Fixed in the prompt** (see DECISIONS.md, 2026-11-05); the stored guide is left unchanged | 4 search calls (11 queries), 32,709 input / 4,729 output tokens, 60.3 s, **≈ $0.046** |
+| Craigslist again, **after the prompt fix** (locally, then on the live site) | Both saved as **OAuth not supported**; summary explains the own-account Bulkpost `client_credentials` alternative. The live-site run also confirmed Render streams the SSE progress end to end | ≈ $0.05 each |
 
 ## Acceptance criteria (spec §13)
 
@@ -53,7 +57,7 @@ code is in the shipped bundle (verified by searching `dist/assets/*.js`).
 | Safe actions + human handoff recorded | Pass | generated from the real action log; handoff present |
 | Never logs in / creates apps / submits forms | Pass (by design) | tool is search-only; prompt boundary; no browser automation |
 | Supported app → structured guide | Pass | live Linear run |
-| Unsupported app → honest result | Partial | facts were honest and the limitation was stated in the summary, but the status label was wrong before the prompt fix; the corrected behaviour is covered by tests but **not yet confirmed by a live run** |
+| Unsupported app → honest result | Pass | Craigslist after the prompt fix: "OAuth not supported", confirmed by two live runs (one on the deployed site) |
 | Insufficient evidence → inconclusive, not fabricated | Partial | tests: zero confirmed sources → not saved; unsourced Verified → Unknown; no live run |
 | Progress reflects backend stages | Pass | stage-order test; live timings (search 0.3 s → 27.3 s) |
 | Saved with unique share URL | Pass | random 43-char `public_id`; uniqueness test |
@@ -86,18 +90,17 @@ code is in the shipped bundle (verified by searching `dist/assets/*.js`).
 | Criterion | Status | Evidence |
 |---|---|---|
 | 7th app via data only | Pass (by design) | data-driven directory; seed tests load any `*.json` |
-| Frontend deployable to Vercel | Not yet | `vercel.json` written from Vercel docs; not deployed |
-| Backend deployable to Render | Not yet | `render.yaml` written from Render docs; not deployed |
+| Frontend deployable to Vercel | Pass | deployed: https://oauth-setup-guides-azure.vercel.app (SPA rewrite, CSP, noindex verified) |
+| Backend deployable to Render | Pass | deployed via `render.yaml` Blueprint: https://oauth-guides-api-sxqs.onrender.com |
 | Migrations + seed against Supabase | Pass | `alembic upgrade head` + seed run on 2026-11-05 |
 | README + `.env.example` | Pass | this repository |
-| Deployed URL, repo URL verified | Not yet | requires accounts/approval (see README) |
+| Deployed URL, repo URL verified | Pass | live e2e 33/33; repo https://github.com/Naman1031/oauth-setup-guides matches local `main` |
 
-## Not yet verified (to do after deployment)
-1. Render streams SSE for about 60 s without buffering or cutting off (Render's docs don't say).
-2. Vercel applies `X-Robots-Tag` to rewritten `/guides/*` paths (Vercel's docs don't say). The page also sets a `noindex` meta tag.
-3. The CSP doesn't block anything in a real browser.
-4. ~~Browser checks~~: done by the user on 2026-11-05 (layout incl. narrow width, search, checklist persistence, Share/Copy, citations, generated guide page).
-5. A live run confirming the corrected "not supported" label (e.g. re-run Craigslist, ≈ $0.05).
+## Verified after deployment
+1. Render streams the ~60-second SSE progress without buffering (live Craigslist run from the deployed site).
+2. Vercel sends `X-Robots-Tag: noindex` on rewritten `/guides/*` pages (e2e check).
+3. The CSP doesn't block the app: guides load and research works in a real browser on the live site.
+4. Browser checks by the user: layout incl. narrow width, search, checklist persistence, Share/Copy, citations.
 
 ## What checking the guidance taught us
 - Seed guides: 60/60 cited URLs live; several were updated to the pages they now redirect to; HubSpot's guide was rebuilt for its new CLI platform (legacy app creation ended 2026-06-23); Discord's two conflicting review thresholds are both shown, the older one marked Unknown.

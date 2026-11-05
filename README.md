@@ -15,10 +15,18 @@ It is a research and guide product, not an OAuth provider or credential manager.
 - **Copy Guide** (Markdown with sources), **Share Guide** (copies the URL), and a checklist
   stored only in your browser.
 
-| Deliverable | Status |
+| Deliverable | Link |
 |---|---|
-| Deployed application URL | _Not deployed yet._ |
-| Source repository URL | _Not published yet._ |
+| **Live application** | https://oauth-setup-guides-azure.vercel.app |
+| **API** (health) | https://oauth-guides-api-sxqs.onrender.com/api/health |
+| **Source repository** | https://github.com/Naman1031/oauth-setup-guides |
+
+Example generated guides (unlisted links):
+[Linear, OAuth supported](https://oauth-setup-guides-azure.vercel.app/guides/CwJRgSWgZWtlL7d1dqMDG4sWVsVB4E-Ap69LFwoGdog) ·
+[Craigslist, OAuth not supported](https://oauth-setup-guides-azure.vercel.app/guides/Nn5iUlPITmpdGeM2vAkC2fX9fSJrgKWXkohmZARwzgk)
+
+> The API runs on Render's free plan and sleeps after 15 idle minutes, so the first
+> page load can take up to a minute while it wakes up.
 
 Specification: [`PROJECT_SPEC.md`](PROJECT_SPEC.md) · Decisions: [`DECISIONS.md`](DECISIONS.md) · Test report: [`docs/TEST_REPORT.md`](docs/TEST_REPORT.md)
 
@@ -54,7 +62,7 @@ backend/
   app/api/                        thin HTTP routes, one error shape
   migrations/                     Alembic (0001 creates both tables + RLS)
   scripts/                        seed_applications, create_test_database, e2e_check
-  tests/                          150 pytest tests (fake OpenAI client: no cost)
+  tests/                          151 pytest tests (fake OpenAI client: no cost)
 seed_data/guides/<slug>.json      one file per directory application
 render.yaml                       Render Blueprint for the API
 ```
@@ -123,7 +131,7 @@ To point it elsewhere, create `frontend/.env.local` with `VITE_API_BASE_URL=...`
 ```bash
 cd backend
 python -m scripts.create_test_database     # once; creates the DB named in TEST_DATABASE_URL
-pytest                                     # 150 tests, no OpenAI cost (fake client)
+pytest                                     # 151 tests, no OpenAI cost (fake client)
 python -m scripts.e2e_check --api http://localhost:8000 --frontend-origin http://localhost:5173
 
 cd ../frontend
@@ -266,8 +274,6 @@ in-process rate limiting (no Redis); no Docker, LangChain, auth or job queue.
   concurrency limits still cap total spend.
 - **Free-tier hosting:** Render spins the API down after 15 minutes idle, and waking it takes
   about a minute (the UI explains the wait). Vercel Hobby is for personal, non-commercial use.
-- **Unverified hosting behaviour:** Render's docs don't state a maximum duration for streamed
-  (SSE) responses. A research run takes about 1 minute; this has to be confirmed after deployment.
 - Seed guides are not tested end to end against the providers (marked "Not tested"), and
   guides do not refresh automatically as provider docs change.
 - The seed script never unpublishes an application whose file was deleted; set
