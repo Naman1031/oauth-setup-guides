@@ -1,0 +1,33 @@
+# Render Blueprint for the FastAPI backend (free web service).
+# Docs: https://render.com/docs/blueprint-spec  (verified 2026-11-05)
+#
+# Not here on purpose:
+# - Database migrations: preDeployCommand is a paid-plan feature, so run
+#   `alembic upgrade head` from your machine against Supabase (see README).
+# - Secrets: `sync: false` makes Render ask for them when the Blueprint is
+#   first created; they are never stored in this file.
+services:
+  - type: web
+    name: oauth-guides-api
+    runtime: python
+    plan: free
+    region: singapore          # same region as the Supabase project
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # --proxy-headers: use the client IP from Render's proxy for rate limiting.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.2"
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL        # Supabase session pooler URI
+        sync: false
+      - key: CORS_ORIGINS        # e.g. https://your-app.vercel.app
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-6-luna

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Search } from 'lucide-react'
 import { ApplicationCard } from '@/components/ApplicationCard'
+import { CardSkeletons, LoadError, LoadingNote } from '@/components/LoadingStates'
 import { ResearchForm } from '@/components/ResearchForm'
 import { WORKING_TITLE } from '@/components/AppLayout'
 import { Input } from '@/components/ui/input'
@@ -8,24 +9,30 @@ import { listApplications } from '@/services/guideService'
 import type { ApplicationSummary } from '@/types/guide'
 
 export function HomePage() {
-  const [applications, setApplications] = useState<ApplicationSummary[] | null>(null)
-  const [loadFailed, setLoadFailed] = useState(false)
+  // One state value per attempt: `attempt` changes when the user clicks "Try again".
+  const [attempt, setAttempt] = useState(0)
+  const [result, setResult] = useState<{ attempt: number; applications: ApplicationSummary[] | null; failed: boolean } | null>(null)
   const [query, setQuery] = useState('')
 
-  // Load the directory once when the page first appears.
+  // Load the directory when the page appears (and again on retry).
   useEffect(() => {
     let cancelled = false // ignore the result if the user already left the page
     listApplications()
-      .then((result) => {
-        if (!cancelled) setApplications(result)
+      .then((applications) => {
+        if (!cancelled) setResult({ attempt, applications, failed: false })
       })
       .catch(() => {
-        if (!cancelled) setLoadFailed(true)
+        if (!cancelled) setResult({ attempt, applications: null, failed: true })
       })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [attempt])
+
+  // A result from an older attempt counts as "still loading".
+  const current = result?.attempt === attempt ? result : null
+  const applications = current?.applications ?? null
+  const loadFailed = current?.failed ?? false
 
   // Derived data: recomputed on every render from state, never stored separately.
   const normalizedQuery = query.trim().toLowerCase()
@@ -61,9 +68,19 @@ export function HomePage() {
           </div>
         </div>
 
-        {loadFailed && <p className="text-sm text-destructive">The application directory could not be loaded.</p>}
-        {applications === null && !loadFailed && <p className="text-sm text-muted-foreground">Loading applications…</p>}
-        {applications !== null && visibleApplications.length === 0 && (
+        {loadFailed && (
+          <LoadError message="The application directory could not be loaded." onRetry={() => setAttempt((n) => n + 1)} />
+        )}
+        {current === null && (
+          <>
+            <LoadingNote label="Loading applications…" />
+            <CardSkeletons />
+          </>
+        )}
+        {applications !== null && applications.length === 0 && (
+          <p className="text-sm text-muted-foreground">No applications are published yet. You can research one below.</p>
+        )}
+        {applications !== null && applications.length > 0 && visibleApplications.length === 0 && (
           <p className="text-sm text-muted-foreground">
             No application matches “{query.trim()}”. You can research it below.
           </p>

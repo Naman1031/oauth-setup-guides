@@ -173,10 +173,12 @@ def reconcile(guide: GuideContent, trace: ResearchTrace, application_name: str, 
     portal["safe_actions_attempted"] = _actions_log(trace)
     if not portal["pages_inspected"] and portal["status"] != PortalExplorationStatus.NOT_ATTEMPTED.value:
         portal["status"] = PortalExplorationStatus.NOT_ATTEMPTED.value
-        portal["observations"] = [
-            "The research agent did not open a setup portal page directly; findings come from search results and documentation.",
-            *portal["observations"],
-        ][:20]
+        if trace.opened_pages:
+            note = ("The pages the research agent opened (listed under safe actions) were documentation, "
+                    "not a setup portal; no portal page was inspected.")
+        else:
+            note = "The research agent did not open any page directly; findings come from search results."
+        portal["observations"] = [note, *portal["observations"]][:20]
         report.portal_downgraded = True
 
     # 4. Fields we own.

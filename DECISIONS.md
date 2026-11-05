@@ -40,3 +40,15 @@ first.
 | 2026-11-05 | A result is saved only if it validates, keeps ≥1 confirmed source, and (if "supported") has ≥1 setup step. | Spec: never store empty/invalid results. |
 | 2026-11-05 | In-process rate limits: 5/hour per IP, 30/day per server, 2 concurrent. Reset on restart; not shared across instances. | Spec allows an in-process limiter if documented. |
 | 2026-11-05 | Frontend reads SSE from a `fetch` POST body (not `EventSource`, which is GET-only). A stream that ends without `complete`/`error` is shown as an error. | Spec: disconnects must never look like success. |
+| 2026-11-05 | Research input is validated in the route BEFORE taking a rate-limit slot (422 on bad input); stage 1 re-validates. | Typos must not use up a user's hourly quota or cost anything. |
+| 2026-11-05 | Security headers via a pure ASGI middleware (outermost) + explicitly on the 500 handler. | `@app.middleware` can't reach Starlette's crash responses; ASGI middleware doesn't buffer SSE. |
+| 2026-11-05 | In production, `CORS_ORIGINS` must be https:// (startup fails otherwise). | Misconfiguration should fail loudly, not silently. |
+| 2026-11-05 | `shadcn` moved to devDependencies. | It's a build-time CLI (one CSS import); its audit advisories don't ship to browsers. |
+| 2026-11-05 | Migrations run manually from a developer machine, not on Render. | Render `preDeployCommand` is paid-only; avoids migrating during builds. |
+| 2026-11-05 | Render: `--proxy-headers --forwarded-allow-ips="*"`; PYTHON_VERSION 3.12.2; region singapore. | Real client IP for rate limiting (best-effort, X-Forwarded-For is client-influenced); version parity with local; same region as Supabase. |
+| 2026-11-05 | Vercel CSP allows `connect-src https://*.onrender.com`; `style-src 'unsafe-inline'`. | Built bundle has no inline scripts but React Router/Radix set inline style attributes. |
+| 2026-11-05 | `robots.txt` does not Disallow `/guides/`. | Crawlers must fetch a page to see its noindex; Disallow would hide it. |
+| 2026-11-05 | "Server may be waking up" hint after 4 s of loading. | Explains free-tier cold starts; it is not progress and no state depends on it. |
+| 2026-11-05 | `.gitattributes` forces LF line endings. | Stops CRLF churn between Windows and Linux (Render/Vercel). |
+| 2026-11-05 | **"OAuth supported" means delegated end-user authorization** (developer registers an OAuth app; each end user consents). Own-account-only access (OAuth client_credentials with the owner's credentials, API keys, personal tokens) is "not supported", with the alternative explained in the summary. | Decided from the original assignment ("wants their users to connect an app", "create an OAuth app … get it approved", "their users' connections"). Found via the Craigslist live run, which was labelled "supported" for its own-account Bulkpost API. |
+| 2026-11-05 | `get_settings()` re-raises configuration errors with field names and reasons only (`ConfigurationError`, `from None`). | Pydantic's default message includes submitted values, which would leak the database URL / API key into Render logs on a failed start. |

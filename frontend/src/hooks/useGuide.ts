@@ -10,25 +10,28 @@ export type GuideLoadState =
   | { kind: 'error' }
   | { kind: 'loaded'; guide: GuideContent }
 
-export function useGuide(id: string, load: (id: string) => Promise<GuideContent | null>): GuideLoadState {
-  // Remember WHICH id a result belongs to. If the URL changes to a new id,
-  // the stored result no longer matches and we report "loading" until the
-  // new result arrives, without an extra setState call.
-  const [result, setResult] = useState<{ id: string; state: GuideLoadState } | null>(null)
+export function useGuide(id: string, load: (id: string) => Promise<GuideContent | null>) {
+  // `attempt` increases on retry. A stored result counts only if it belongs
+  // to the current id AND attempt; otherwise we report "loading" without an
+  // extra setState call.
+  const [attempt, setAttempt] = useState(0)
+  const [result, setResult] = useState<{ key: string; state: GuideLoadState } | null>(null)
+  const key = `${id}#${attempt}`
 
   useEffect(() => {
     let cancelled = false // ignore late results after the id changes or the page unmounts
     load(id)
       .then((guide) => {
-        if (!cancelled) setResult({ id, state: guide ? { kind: 'loaded', guide } : { kind: 'not-found' } })
+        if (!cancelled) setResult({ key, state: guide ? { kind: 'loaded', guide } : { kind: 'not-found' } })
       })
       .catch(() => {
-        if (!cancelled) setResult({ id, state: { kind: 'error' } })
+        if (!cancelled) setResult({ key, state: { kind: 'error' } })
       })
     return () => {
       cancelled = true
     }
-  }, [id, load])
+  }, [id, load, key])
 
-  return result?.id === id ? result.state : { kind: 'loading' }
+  const state: GuideLoadState = result?.key === key ? result.state : { kind: 'loading' }
+  return { state, retry: () => setAttempt((n) => n + 1) }
 }

@@ -14,11 +14,13 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, Request
 from fastapi.responses import StreamingResponse
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.api.errors import ApiError
 from app.core.config import Settings, get_settings
 from app.db.session import get_session_factory
+from app.schemas.research import ResearchRequest
 from app.services.research.openai_runner import ResponsesClient, make_openai_client
 from app.services.research.rate_limit import ResearchRateLimiter
 from app.services.research.workflow import run_research
@@ -61,6 +63,14 @@ def research_stream(
 ) -> StreamingResponse:
     if int(request.headers.get("content-length") or 0) > MAX_BODY_BYTES:
         raise ApiError(413, "payload_too_large", "The request is too large.")
+
+    # Reject bad input BEFORE taking a rate-limit slot, so typos don't use up
+    # someone's hourly quota. (The workflow's stage 1 validates again.)
+    try:
+        ResearchRequest.model_validate(body)
+    except ValidationError as error:
+        fields = sorted({str(e["loc"][0]) for e in error.errors() if e["loc"]})
+        raise ApiError(422, "invalid_request", f"Invalid input: {', '.join(fields) or 'request'}.") from error
 
     # Behind Render's proxy, uvicorn's --proxy-headers makes this the real client IP.
     client_ip = request.client.host if request.client else "unknown"

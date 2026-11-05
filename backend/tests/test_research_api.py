@@ -79,10 +79,15 @@ def test_oversized_body_rejected(client: TestClient, seeded_db: Session) -> None
 
 
 @requires_db
-def test_invalid_input_is_reported_in_stream(client: TestClient, seeded_db: Session) -> None:
-    install_fakes(client, seeded_db, ResearchRateLimiter(5, 10, 1))
-    events = parse_sse(client.post("/api/research/stream", json={"application_name": "X", "website_url": "http://localhost"}).text)
-    assert events[-1][0] == "error" and events[-1][1]["code"] == "invalid_input"
+def test_invalid_input_is_rejected_without_using_quota(client: TestClient, seeded_db: Session) -> None:
+    limiter = ResearchRateLimiter(per_ip_per_hour=1, per_day=10, max_concurrent=1)
+    install_fakes(client, seeded_db, limiter)
+    for bad in [{"application_name": "X", "website_url": "http://localhost"}, {"application_name": ""}, {"nope": 1}]:
+        response = client.post("/api/research/stream", json=bad)
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "invalid_request"
+    # The single hourly slot is still available for a valid request.
+    assert client.post("/api/research/stream", json={"application_name": "Valid"}).status_code == 200
 
 
 @requires_db
@@ -121,3 +126,14 @@ def test_limiter_daily_and_concurrency() -> None:
     assert limiter.try_acquire("b").allowed
     limiter.release()
     assert limiter.try_acquire("c").reason == "daily"
+
+
+@requires_db
+def test_sse_stream_has_security_headers(client: TestClient, seeded_db: Session) -> None:
+    from .test_api import assert_security_headers
+
+    install_fakes(client, seeded_db, ResearchRateLimiter(5, 10, 1))
+    response = client.post("/api/research/stream", json={"application_name": "Example"})
+    assert response.status_code == 200
+    assert_security_headers(response)
+    assert parse_sse(response.text)[-1][0] == "complete"  # body still streamed intact

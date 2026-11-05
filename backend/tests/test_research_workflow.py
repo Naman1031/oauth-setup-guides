@@ -183,3 +183,15 @@ def test_research_error_detail_is_not_sent_to_client(db: Session) -> None:
 
     events = run(db, FakeClient(ExplodingResponses()))
     assert "secret internal detail" not in json.dumps(events)
+
+
+@pytest.mark.parametrize("key", ["", "   "])
+def test_empty_api_key_counts_as_not_configured(key: str) -> None:
+    from pydantic import SecretStr
+
+    from app.services.research.openai_runner import make_openai_client
+
+    settings = get_settings().model_copy(update={"openai_api_key": SecretStr(key), "openai_model": "m"})
+    with pytest.raises(ResearchError) as excinfo:
+        make_openai_client(settings)
+    assert excinfo.value.code == ErrorCode.NOT_CONFIGURED

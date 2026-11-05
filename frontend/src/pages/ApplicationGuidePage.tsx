@@ -1,6 +1,7 @@
 import { Link, useParams } from 'react-router'
 import { WORKING_TITLE } from '@/components/AppLayout'
 import { GuideView } from '@/components/guide/GuideView'
+import { LoadError, LoadingNote } from '@/components/LoadingStates'
 import { useGuide } from '@/hooks/useGuide'
 import { getApplicationGuide } from '@/services/guideService'
 import { NotFoundPage } from './NotFoundPage'
@@ -8,11 +9,11 @@ import { NotFoundPage } from './NotFoundPage'
 /** Pre-built directory guide at /apps/:slug */
 export function ApplicationGuidePage() {
   const { slug = '' } = useParams() // the ":slug" part of the URL
-  const state = useGuide(slug, getApplicationGuide)
+  const { state, retry } = useGuide(slug, getApplicationGuide)
 
-  if (state.kind === 'loading') return <p className="text-sm text-muted-foreground">Loading guide…</p>
+  if (state.kind === 'loading') return <LoadingNote label="Loading guide…" />
   if (state.kind === 'not-found') return <NotFoundPage message="There is no guide for this application." />
-  if (state.kind === 'error') return <p className="text-sm text-destructive">The guide could not be loaded. Try refreshing the page.</p>
+  if (state.kind === 'error') return <LoadError message="The guide could not be loaded." onRetry={retry} />
 
   return (
     <>

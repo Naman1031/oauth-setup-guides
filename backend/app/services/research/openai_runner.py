@@ -58,10 +58,11 @@ class ResearchCallResult:
 
 
 def make_openai_client(settings: Settings) -> ResponsesClient:
-    if settings.openai_api_key is None or not settings.openai_model:
+    key = settings.openai_api_key.get_secret_value().strip() if settings.openai_api_key else ""
+    if not key or not settings.openai_model:  # missing OR an empty `OPENAI_API_KEY=` line
         raise ResearchError(ErrorCode.NOT_CONFIGURED, "OPENAI_API_KEY or OPENAI_MODEL is not set")
     return openai.OpenAI(
-        api_key=settings.openai_api_key.get_secret_value(),
+        api_key=key,
         timeout=settings.openai_timeout_seconds,
         max_retries=0,
     )

@@ -120,3 +120,23 @@ def test_model_schema_is_strict_and_has_no_length_keywords() -> None:
     root = guide_json_schema()
     assert root["additionalProperties"] is False
     assert set(root["required"]) == set(root["properties"])
+
+
+def test_portal_note_distinguishes_documentation_pages_from_no_pages() -> None:
+    # Seen in the Craigslist live run: an API doc page was opened, but no portal page.
+    raw = github_guide()
+    with_doc_page = extract_trace([search_call("q", all_urls(raw)), open_page_call("https://docs.github.com/en/apps")])
+    guide, _ = reconcile(GuideContent.model_validate(raw), with_doc_page, "GitHub", TODAY)
+    assert "were documentation, not a setup portal" in guide.portal_exploration.observations[0]
+
+    search_only = extract_trace([search_call("q", all_urls(raw))])
+    guide, _ = reconcile(GuideContent.model_validate(github_guide()), search_only, "GitHub", TODAY)
+    assert "did not open any page directly" in guide.portal_exploration.observations[0]
+
+
+def test_prompt_defines_supported_as_delegated_user_authorization() -> None:
+    # Product decision (2026-11-05): own-account-only access (client_credentials, API keys) is "not_supported".
+    from app.services.research.prompt import INSTRUCTIONS
+
+    assert "END USERS must connect their own accounts" in INSTRUCTIONS
+    assert "client_credentials grant using" in INSTRUCTIONS and '"not_supported"' in INSTRUCTIONS

@@ -1,0 +1,6 @@
+# Directory pages may be indexed. Unlisted generated guides (/guides/...) are
+# NOT blocked here on purpose: crawlers must be able to fetch them to see the
+# "noindex" header/meta tag. A Disallow rule would hide that instruction and
+# the bare URL could still be listed.
+User-agent: *
+Allow: /

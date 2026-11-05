@@ -11,6 +11,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.core.security_headers import SECURITY_HEADERS
+
 logger = logging.getLogger(__name__)
 
 
@@ -50,4 +52,6 @@ def register_error_handlers(app: FastAPI) -> None:
     async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
         # Full details go to the server log only.
         logger.exception("Unhandled error on %s %s", request.method, request.url.path)
-        return error_response(500, "internal_error", "Something went wrong. Please try again later.")
+        # This response is built outside our middleware stack, so add the headers here.
+        headers = {name.decode(): value.decode() for name, value in SECURITY_HEADERS}
+        return error_response(500, "internal_error", "Something went wrong. Please try again later.", headers)

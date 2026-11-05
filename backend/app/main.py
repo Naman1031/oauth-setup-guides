@@ -5,13 +5,14 @@ Run locally:  uvicorn app.main:app --reload   (from the backend/ folder)
 
 import logging
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.errors import register_error_handlers
 from app.api.research import router as research_router
 from app.api.routes import router
 from app.core.config import get_settings
+from app.core.security_headers import SecurityHeadersMiddleware
 from app.services.research.rate_limit import ResearchRateLimiter
 
 
@@ -36,13 +37,11 @@ def create_app() -> FastAPI:
         allow_credentials=False,  # no cookies or auth; the API has no logins
     )
 
-    # API responses are data, not pages: ask search engines never to index
-    # them. A middleware runs on EVERY response, including error responses.
-    @app.middleware("http")
-    async def add_noindex_header(request: Request, call_next):  # type: ignore[no-untyped-def]
-        response = await call_next(request)
-        response.headers["X-Robots-Tag"] = "noindex, nofollow"
-        return response
+    # Security headers (noindex, nosniff, ...) on every response; see security_headers.py.
+    # Starlette makes the LAST-added middleware the outermost, so this also
+    # wraps CORS preflight responses. (Crash responses come from Starlette's
+    # built-in error middleware outside it; errors.py adds the headers there.)
+    app.add_middleware(SecurityHeadersMiddleware)
 
     # One limiter per server process (see rate_limit.py for the limitation).
     app.state.research_limiter = ResearchRateLimiter(

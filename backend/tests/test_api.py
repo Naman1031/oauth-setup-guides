@@ -130,3 +130,71 @@ def test_settings_split_origins_and_normalize_db_url(monkeypatch) -> None:
     settings = Settings()  # type: ignore[call-arg]
     assert settings.cors_origins == ["https://a.example", "https://b.example"]
     assert settings.database_url.startswith("postgresql+psycopg://")
+
+
+SECURITY_HEADER_VALUES = {
+    "x-robots-tag": "noindex, nofollow",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "referrer-policy": "no-referrer",
+}
+
+
+def assert_security_headers(response) -> None:
+    for name, value in SECURITY_HEADER_VALUES.items():
+        assert response.headers.get(name) == value, (name, response.status_code)
+
+
+@requires_db
+def test_security_headers_on_success_404_and_preflight(client: TestClient) -> None:
+    assert_security_headers(client.get("/api/applications"))
+    assert_security_headers(client.get("/api/applications/nope"))
+    assert_security_headers(client.get("/api/does-not-exist"))
+    assert_security_headers(client.options("/api/applications", headers={"Origin": "http://localhost:5173", "Access-Control-Request-Method": "GET"}))
+
+
+@requires_db
+def test_security_headers_on_unexpected_500(seeded_db: Session) -> None:
+    from app.db.session import get_db
+    from app.main import app
+
+    def broken_db():
+        raise RuntimeError("boom")
+
+    app.dependency_overrides[get_db] = broken_db
+    try:
+        with TestClient(app, raise_server_exceptions=False) as test_client:
+            response = test_client.get("/api/applications")
+    finally:
+        app.dependency_overrides.clear()
+    assert response.status_code == 500
+    assert_security_headers(response)
+
+
+def test_production_requires_https_cors(monkeypatch) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("CORS_ORIGINS", "http://insecure.example")
+    with pytest.raises(ValidationError, match="https"):
+        Settings()  # type: ignore[call-arg]
+    monkeypatch.setenv("CORS_ORIGINS", "https://app.example")
+    assert Settings().cors_origins == ["https://app.example"]  # type: ignore[call-arg]
+
+
+def test_configuration_errors_never_print_secret_values(monkeypatch) -> None:
+    from app.core.config import ConfigurationError, get_settings
+
+    secret = "sk-THIS-MUST-NOT-APPEAR-1234567890"
+    db_secret = "postgresql://user:VerySecretDbPassword@db.example:5432/x_test"
+    monkeypatch.setenv("OPENAI_API_KEY", secret)
+    monkeypatch.setenv("DATABASE_URL", db_secret)
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("CORS_ORIGINS", "http://insecure.example")
+    get_settings.cache_clear()
+    try:
+        with pytest.raises(ConfigurationError) as excinfo:
+            get_settings()
+        text = str(excinfo.value) + repr(excinfo.value.__cause__) + repr(excinfo.value.__context__ if excinfo.value.__suppress_context__ is False else None)
+        assert "CORS_ORIGINS must be https" in str(excinfo.value)
+        assert secret not in text and "VerySecretDbPassword" not in text
+    finally:
+        get_settings.cache_clear()

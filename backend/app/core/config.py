@@ -8,7 +8,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]  # .../backend
@@ -72,8 +72,34 @@ class Settings(BaseSettings):
             raise ValueError("CORS_ORIGINS must list explicit origins, not '*'")
         return value
 
+    @model_validator(mode="after")
+    def _production_rules(self) -> "Settings":
+        # Fail at startup rather than run a misconfigured production server.
+        if self.environment == "production":
+            insecure = [origin for origin in self.cors_origins if not origin.startswith("https://")]
+            if insecure:
+                raise ValueError(f"in production, CORS_ORIGINS must be https:// origins (got {insecure})")
+        return self
+
+
+class ConfigurationError(RuntimeError):
+    """Startup configuration problem. Its message names fields only, never their values."""
+
 
 @lru_cache
 def get_settings() -> Settings:
-    """Create Settings once and reuse it (lru_cache remembers the result)."""
-    return Settings()  # type: ignore[call-arg]  # values come from the environment
+    """Create Settings once and reuse it (lru_cache remembers the result).
+
+    Pydantic's normal error text includes the submitted values, which here
+    would be secrets (database URL, API key) printed into server logs. We
+    re-raise with field names and reasons only, and `from None` drops the
+    original error (and its values) from the traceback.
+    """
+    try:
+        return Settings()  # type: ignore[call-arg]  # values come from the environment
+    except ValidationError as error:
+        problems = "; ".join(
+            f"{'.'.join(str(part) for part in e['loc']) or 'settings'}: {e['msg']}"
+            for e in error.errors(include_input=False, include_url=False)
+        )
+        raise ConfigurationError(f"Invalid configuration: {problems}") from None
