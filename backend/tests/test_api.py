@@ -183,8 +183,9 @@ def test_production_requires_https_cors(monkeypatch) -> None:
 def test_configuration_errors_never_print_secret_values(monkeypatch) -> None:
     from app.core.config import ConfigurationError, get_settings
 
-    secret = "sk-THIS-MUST-NOT-APPEAR-1234567890"
-    db_secret = "postgresql://user:VerySecretDbPassword@db.example:5432/x_test"
+    # Fake values, assembled at runtime so no key-shaped literal sits in the repo.
+    secret = "sk" + "-" + "FAKE" * 6
+    db_secret = "postgresql://user:" + "FakeDbPassword" + "@db.example:5432/x_test"
     monkeypatch.setenv("OPENAI_API_KEY", secret)
     monkeypatch.setenv("DATABASE_URL", db_secret)
     monkeypatch.setenv("ENVIRONMENT", "production")
@@ -195,6 +196,6 @@ def test_configuration_errors_never_print_secret_values(monkeypatch) -> None:
             get_settings()
         text = str(excinfo.value) + repr(excinfo.value.__cause__) + repr(excinfo.value.__context__ if excinfo.value.__suppress_context__ is False else None)
         assert "CORS_ORIGINS must be https" in str(excinfo.value)
-        assert secret not in text and "VerySecretDbPassword" not in text
+        assert secret not in text and "FakeDbPassword" not in text
     finally:
         get_settings.cache_clear()
